@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReAct_Agent — Complete Call Flow &amp; Architecture Documentation</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #0f172a; --surface: #1e293b; --border: #334155;
+  --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+  --warn: #fbbf24; --err: #f87171; --ok: #34d399;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+.container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+h1 { font-size: 2.4rem; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+h2 { font-size: 1.7rem; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+h3 { font-size: 1.25rem; margin: 32px 0 12px; color: var(--accent); }
+h4 { font-size: 1.05rem; margin: 20px 0 8px; color: var(--warn); }
+p { margin: 8px 0; color: var(--muted); }
+.subtitle { color: var(--muted); font-size: 1.1rem; margin-bottom: 32px; }
+.mermaid { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; overflow-x: auto; position: relative; }
+.mermaid.is-enhanced { padding: 0; overflow: hidden; min-height: 260px; }
+.mermaid-viewport { padding: 54px 24px 24px; overflow: hidden; cursor: grab; touch-action: none; min-height: 260px; }
+.mermaid-viewport.is-dragging { cursor: grabbing; }
+.mermaid-viewport svg { max-width: none !important; height: auto; transform-origin: 0 0; transition: transform 120ms ease; }
+.mermaid-toolbar { position: absolute; top: 10px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 6px; background: rgba(15,23,42,0.92); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.28); }
+.mermaid-toolbar button, .mermaid-toolbar .zoom-level { height: 28px; min-width: 32px; border: 1px solid var(--border); border-radius: 6px; background: #1e293b; color: var(--text); font: 600 0.78rem system-ui, sans-serif; display: inline-flex; align-items: center; justify-content: center; }
+.mermaid-toolbar button { cursor: pointer; }
+.mermaid-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+.mermaid-toolbar .zoom-level { min-width: 52px; color: var(--muted); background: transparent; }
+.call-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
+.call-table th { background: #1a2744; color: var(--accent); text-align: left; padding: 10px 14px; border: 1px solid var(--border); }
+.call-table td { padding: 8px 14px; border: 1px solid var(--border); vertical-align: top; }
+.call-table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.tag-async { background: #7c3aed33; color: #a78bfa; }
+.tag-class { background: #05966933; color: var(--ok); }
+.tag-func { background: #2563eb33; color: var(--accent); }
+.tag-cmd { background: #d9770633; color: var(--warn); }
+.tag-endpoint { background: #dc262633; color: var(--err); }
+.tag-hook { background: #db277733; color: #f472b6; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 16px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin: 16px 0; }
+.arrow-chain { font-family: 'Fira Code', monospace; font-size: 0.85rem; color: var(--accent); padding: 10px; background: rgba(56,189,248,0.06); border-radius: 6px; }
+code { font-family: 'Fira Code', 'Cascadia Code', monospace; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 3px; font-size: 0.88em; }
+ul, ol { margin: 8px 0 8px 24px; color: var(--muted); }
+li { margin: 4px 0; }
+a { color: var(--accent); }
+hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+.nav { position: sticky; top: 0; background: var(--bg); z-index: 10; padding: 12px 0; border-bottom: 1px solid var(--border); display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9rem; }
+.nav a { text-decoration: none; }
+.nav a:hover { text-decoration: underline; }
+@media (max-width: 768px) { .container { padding: 16px; } h1 { font-size: 1.8rem; } }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>ReAct_Agent — Complete Call Flow &amp; Architecture Documentation</h1>
+<p class="subtitle">Generated from graphify knowledge graph: 58 nodes, 92 edges, 9 communities. Commit: unknown</p>
+
+<div class="nav">
+    <a href="#overview">Architecture Overview</a>
+    <a href="#analysis-clustering">Analysis &amp; Clustering</a>
+    <a href="#cli-skills">CLI &amp; Skill Installers</a>
+    <a href="#langchain-agent5py-llm">Langchain Agent5Py Llm</a>
+    <a href="#langchain-agent5py-database">Langchain Agent5Py Database</a>
+    <a href="#langchain-agent5py-string">Langchain Agent5Py String</a>
+    <a href="#prompt-loaderpy-utils">Prompt Loaderpy Utils</a>
+</div>
+
+<!-- ====== Architecture Overview ====== -->
+<h2 id="overview">1. Architecture Overview</h2>
+
+<div class="mermaid">
+
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    ANALYSIS_CLUSTERING_C79796DA("Analysis &amp; Clustering<br/><small>10 nodes</small>")
+    class ANALYSIS_CLUSTERING_C79796DA module;
+    CLI_SKILLS_9964CBB8("CLI &amp; Skill Installers<br/><small>15 nodes</small>")
+    class CLI_SKILLS_9964CBB8 module;
+    LANGCHAIN_AGENT5PY_LLM_F29170D7("Langchain Agent5Py Llm<br/><small>13 nodes</small>")
+    class LANGCHAIN_AGENT5PY_LLM_F29170D7 module;
+    LANGCHAIN_AGENT5PY_DATABASE_EC8B86F5("Langchain Agent5Py Database<br/><small>12 nodes</small>")
+    class LANGCHAIN_AGENT5PY_DATABASE_EC8B86F5 module;
+    LANGCHAIN_AGENT5PY_STRING_AC4AA705("Langchain Agent5Py String<br/><small>5 nodes</small>")
+    class LANGCHAIN_AGENT5PY_STRING_AC4AA705 module;
+    PROMPT_LOADERPY_UTILS_2A2CB63B("Prompt Loaderpy Utils<br/><small>3 nodes</small>")
+    class PROMPT_LOADERPY_UTILS_2A2CB63B module;
+    LANGCHAIN_AGENT5PY_DATABASE_EC8B86F5 -->|method x4| ANALYSIS_CLUSTERING_C79796DA
+    LANGCHAIN_AGENT5PY_DATABASE_EC8B86F5 -->|calls x3| LANGCHAIN_AGENT5PY_LLM_F29170D7
+    CLI_SKILLS_9964CBB8 -->|imports x2| LANGCHAIN_AGENT5PY_LLM_F29170D7
+    CLI_SKILLS_9964CBB8 -->|imports x2| LANGCHAIN_AGENT5PY_DATABASE_EC8B86F5
+    LANGCHAIN_AGENT5PY_LLM_F29170D7 -->|imports x2| PROMPT_LOADERPY_UTILS_2A2CB63B
+    ANALYSIS_CLUSTERING_C79796DA -->|calls x2| LANGCHAIN_AGENT5PY_STRING_AC4AA705
+    LANGCHAIN_AGENT5PY_LLM_F29170D7 -->|contains| LANGCHAIN_AGENT5PY_DATABASE_EC8B86F5
+    LANGCHAIN_AGENT5PY_LLM_F29170D7 -->|contains| LANGCHAIN_AGENT5PY_STRING_AC4AA705
+    LANGCHAIN_AGENT5PY_LLM_F29170D7 -->|calls| ANALYSIS_CLUSTERING_C79796DA
+    LANGCHAIN_AGENT5PY_DATABASE_EC8B86F5 -->|calls| PROMPT_LOADERPY_UTILS_2A2CB63B
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h4>Architecture Layers</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>Layer</th><th>Nodes</th><th>Communities</th></tr>
+      <tr><td>Analysis &amp; Clustering</td><td>10</td><td><code>3, 4</code></td></tr><tr><td>CLI &amp; Skill Installers</td><td>15</td><td><code>2, 6, 8</code></td></tr><tr><td>Langchain Agent5Py Llm</td><td>13</td><td><code>0</code></td></tr><tr><td>Langchain Agent5Py Database</td><td>12</td><td><code>1</code></td></tr><tr><td>Langchain Agent5Py String</td><td>5</td><td><code>5</code></td></tr><tr><td>Prompt Loaderpy Utils</td><td>3</td><td><code>7</code></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Core Flow</h4>
+    <div class="arrow-chain">CLI &amp; Skill Installers -&gt; Langchain Agent5Py Llm -&gt; Prompt Loaderpy Utils -&gt; Analysis &amp; Clustering -&gt; Langchain Agent5Py String -&gt; Langchain Agent5Py Database</div>
+  </div>
+</div>
+<hr>
+<!-- ====== 2. Analysis & Clustering ====== -->
+<h2 id="analysis-clustering">2. Analysis &amp; Clustering</h2>
+<p>Analysis &amp; Clustering groups implementation around langchain, agent5py, query, any, mostly in langchain_agent5.py. This section covers 10 nodes and 13 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Analysis &amp; Clustering (10 nodes, 13 edges)
+    subgraph analysis_clustering_langchain_agent5_py_5f8bdef8["langchain_agent5.py"]
+        langchain_agent5_aiagent_execute_db_query_676b26cd("_execute_db_query()<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_aiagent_query_any_database_970a7e87("query_any_database()<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_aiagent_query_database_6e3ccc15("query_database()<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_aiagent_chat_80672529("chat()<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_rationale_340_8c1cdda7("Query any .db file in the working direc...<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_rationale_334_e037fefb("Query the default student_grades.db — r...<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_rationale_381_c4121ea7("Returns either: - 'type': 'text', 'con...<br/><small>langchain_agent5.py</small>")
+    end
+    subgraph analysis_clustering_External_generated_9ee0240b["External / generated"]
+        any_c5fe0200("Any")
+        basemessage_761cf5cc("BaseMessage")
+        sqldatabase_8f1c98b7("SQLDatabase")
+    end
+    langchain_agent5_aiagent_execute_db_query_676b26cd -->|calls| langchain_agent5_aiagent_query_any_database_970a7e87
+    langchain_agent5_aiagent_execute_db_query_676b26cd -->|calls| langchain_agent5_aiagent_query_database_6e3ccc15
+    langchain_agent5_aiagent_query_database_6e3ccc15 -->|calls| langchain_agent5_aiagent_chat_80672529
+    langchain_agent5_aiagent_query_any_database_970a7e87 -->|calls| langchain_agent5_aiagent_chat_80672529
+    class langchain_agent5_aiagent_execute_db_query_676b26cd function;
+    class langchain_agent5_aiagent_query_any_database_970a7e87 function;
+    class langchain_agent5_aiagent_query_database_6e3ccc15 function;
+    class langchain_agent5_aiagent_chat_80672529 function;
+    class langchain_agent5_rationale_340_8c1cdda7 concept;
+    class langchain_agent5_rationale_334_e037fefb concept;
+    class langchain_agent5_rationale_381_c4121ea7 concept;
+    class any_c5fe0200 klass;
+    class basemessage_761cf5cc klass;
+    class sqldatabase_8f1c98b7 klass;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>._execute_db_query()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>query_any_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small><br><code>query_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>._execute_db_query() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>SQLDatabase</code><br><small style="color:var(--muted)"></small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>SQLDatabase node in project.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>Any</code><br><small style="color:var(--muted)"></small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Any node in project.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>.query_any_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>_execute_db_query()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><code>chat()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>.query_any_database() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>Query any .db file in the working directory — returns structured result.</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Query any .db file in the working directory — returns structured result..</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>.query_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>_execute_db_query()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><code>chat()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>.query_database() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>.chat()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>query_any_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small><br><code>query_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>Supports retrieval-augmented Q&amp;A or streaming chat.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>BaseMessage</code><br><small style="color:var(--muted)"></small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>BaseMessage node in project.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>Query the default student_grades.db — returns structured result for frontend ren</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Query the default student_grades.db — returns structured result for frontend ren.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>Returns either:           - {&quot;type&quot;: &quot;text&quot;, &quot;content&quot;: str}          → normal t</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Returns either:           - {&quot;type&quot;: &quot;text&quot;, &quot;content&quot;: str}          → normal t.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>langchain_agent5.py</code></td><td>7 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: references x6, calls x4, explains x3. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 3. CLI & Skill Installers ====== -->
+<h2 id="cli-skills">3. CLI &amp; Skill Installers</h2>
+<p>CLI &amp; Skill Installers groups implementation around apppy, agent, get, telemetry, mostly in app.py, config/prompts.yaml, static/telemetry.html. This section covers 15 nodes and 14 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: CLI &amp; Skill Installers (15 nodes, 14 edges)
+    subgraph cli_skills_app_py_c15996b8["app.py"]
+        app_get_standalone_agent_58191ab3("get_standalone_agent()<br/><small>app.py</small>")
+        app_execute_agent_f63d8513("execute_agent()<br/><small>app.py</small>")
+        app_agentexecutionrequest_560017a3("AgentExecutionRequest<br/><small>app.py</small>")
+        app_7d104347("app.py")
+        app_get_agent_trace_47bda71f("get_agent_trace()<br/><small>app.py</small>")
+        app_get_root_interface_14420cad("get_root_interface()<br/><small>app.py</small>")
+        app_serve_telemetry_0f35f2a2("serve_telemetry()<br/><small>app.py</small>")
+        app_rationale_80_57bf4bf1("Executes the ReAct agent within a run-c...<br/><small>app.py</small>")
+        app_rationale_127_ff1e5b29("Interrogates the LangSmith platform API...<br/><small>app.py</small>")
+        app_rationale_179_10156fae("Serves the unified, programmatic tracin...<br/><small>app.py</small>")
+    end
+    claude_md_c26df1fa("Claude Project Rules<br/><small>CLAUDE.md</small>")
+    config_prompts_db_agent_aba11ff1("DB Agent Prompt<br/><small>config/prompts.yaml</small>")
+    requirements_txt_c3ce17be("Project Requirements<br/><small>requirements.txt</small>")
+    claude_skills_graphify_skill_md_995875f6("Graphify Skill Definition<br/><small>skills/graphify/SKILL.md</small>")
+    static_telemetry_html_3f89f885("Telemetry Dashboard<br/><small>static/telemetry.html</small>")
+    app_get_standalone_agent_58191ab3 -->|calls| app_execute_agent_f63d8513
+    class app_get_standalone_agent_58191ab3 function;
+    class app_execute_agent_f63d8513 function;
+    class app_agentexecutionrequest_560017a3 klass;
+    class app_7d104347 module;
+    class app_get_agent_trace_47bda71f function;
+    class app_get_root_interface_14420cad function;
+    class app_serve_telemetry_0f35f2a2 function;
+    class app_rationale_80_57bf4bf1 concept;
+    class app_rationale_127_ff1e5b29 concept;
+    class app_rationale_179_10156fae concept;
+    class claude_md_c26df1fa concept;
+    class config_prompts_db_agent_aba11ff1 concept;
+    class requirements_txt_c3ce17be concept;
+    class claude_skills_graphify_skill_md_995875f6 concept;
+    class static_telemetry_html_3f89f885 concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>app.py</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in app.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>serve_telemetry()</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>serve_telemetry() node in app.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>AgentExecutionRequest</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>AgentExecutionRequest node in app.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>get_standalone_agent()</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>execute_agent()</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td>get_standalone_agent() node in app.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>execute_agent()</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>get_standalone_agent()</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>execute_agent() node in app.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>get_agent_trace()</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>get_agent_trace() node in app.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>get_root_interface()</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>get_root_interface() node in app.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>Executes the ReAct agent within a run-collection block,     capturing the exact</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Executes the ReAct agent within a run-collection block,     capturing the exact.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>Interrogates the LangSmith platform API programmatically using the SDK client.</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Interrogates the LangSmith platform API programmatically using the SDK client..</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>Serves the unified, programmatic tracing console directly.</code><br><small style="color:var(--muted)">app.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Serves the unified, programmatic tracing console directly..</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>DB Agent Prompt</code><br><small style="color:var(--muted)">config/prompts.yaml</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for DB Agent Prompt.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>Telemetry Dashboard</code><br><small style="color:var(--muted)">static/telemetry.html</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Telemetry Dashboard.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>Project Requirements</code><br><small style="color:var(--muted)">requirements.txt</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Project Requirements.</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>Claude Project Rules</code><br><small style="color:var(--muted)">CLAUDE.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Claude Project Rules.</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>Graphify Skill Definition</code><br><small style="color:var(--muted)">skills/graphify/SKILL.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Graphify Skill Definition.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>app.py</code></td><td>10 nodes</td></tr>
+<tr><td><code>skills/graphify/SKILL.md</code></td><td>1 nodes</td></tr>
+<tr><td><code>CLAUDE.md</code></td><td>1 nodes</td></tr>
+<tr><td><code>config/prompts.yaml</code></td><td>1 nodes</td></tr>
+<tr><td><code>requirements.txt</code></td><td>1 nodes</td></tr>
+<tr><td><code>static/telemetry.html</code></td><td>1 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x6, explains x3, references x2, calls x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 4. Langchain Agent5Py Llm ====== -->
+<h2 id="langchain-agent5py-llm">4. Langchain Agent5Py Llm</h2>
+<p>Langchain Agent5Py Llm groups implementation around langchain, agent5py, llm, utilspy, mostly in langchain_agent5.py, utils/llm_utils.py. This section covers 13 nodes and 26 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Langchain Agent5Py Llm (13 nodes, 26 edges)
+    subgraph langchain_agent5py_llm_langchain_agent5_py_01d3a929["langchain_agent5.py"]
+        langchain_agent5_2dae6a86("langchain_agent5.py")
+        langchain_agent5_dbqueryresult_9ca52818("DbQueryResult<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_getdatabaseschemaschema_dd4f919e("GetDatabaseSchemaSchema<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_listavailabledatabasesschema_57550e13("ListAvailableDatabasesSchema<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_listfilesschema_ef2eb46c("ListFilesSchema<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_queryanydatabaseschema_a429989d("QueryAnyDatabaseSchema<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_querydatabaseschema_ac2c5caa("QueryDatabaseSchema<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_readfileschema_0474f243("ReadFileSchema<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_suggestqueriesschema_3eda4cf7("SuggestQueriesSchema<br/><small>langchain_agent5.py</small>")
+        langchain_agent5_aiagent_setup_tools2_dbd6af0b("_setup_tools2()<br/><small>langchain_agent5.py</small>")
+    end
+    subgraph langchain_agent5py_llm_utils_llm_utils_py_582db147["utils/llm_utils.py"]
+        utils_llm_utils_8501e8fb("llm_utils.py")
+        utils_llm_utils_get_resilient_llm_65de87e1("get_resilient_llm()<br/><small>utils/llm_utils.py</small>")
+    end
+    basemodel_a0392da1("BaseModel")
+    langchain_agent5_2dae6a86 -->|imports| utils_llm_utils_8501e8fb
+    langchain_agent5_2dae6a86 -->|imports| utils_llm_utils_get_resilient_llm_65de87e1
+    class langchain_agent5_2dae6a86 module;
+    class langchain_agent5_dbqueryresult_9ca52818 klass;
+    class langchain_agent5_getdatabaseschemaschema_dd4f919e klass;
+    class langchain_agent5_listavailabledatabasesschema_57550e13 klass;
+    class langchain_agent5_listfilesschema_ef2eb46c klass;
+    class langchain_agent5_queryanydatabaseschema_a429989d klass;
+    class langchain_agent5_querydatabaseschema_ac2c5caa klass;
+    class langchain_agent5_readfileschema_0474f243 klass;
+    class langchain_agent5_suggestqueriesschema_3eda4cf7 klass;
+    class langchain_agent5_aiagent_setup_tools2_dbd6af0b function;
+    class utils_llm_utils_8501e8fb module;
+    class utils_llm_utils_get_resilient_llm_65de87e1 function;
+    class basemodel_a0392da1 klass;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>BaseModel</code><br><small style="color:var(--muted)"></small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>BaseModel node in project.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>langchain_agent5.py</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>get_resilient_llm()</code><br><small style="color:var(--muted)">utils/llm_utils.py</small><br><code>llm_utils.py</code><br><small style="color:var(--muted)">utils/llm_utils.py</small></td>
+  <td>Module file in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>ReadFileSchema</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>ReadFileSchema node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>ListFilesSchema</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>ListFilesSchema node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>QueryDatabaseSchema</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>QueryDatabaseSchema node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>SuggestQueriesSchema</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>SuggestQueriesSchema node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>QueryAnyDatabaseSchema</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>QueryAnyDatabaseSchema node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>ListAvailableDatabasesSchema</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>ListAvailableDatabasesSchema node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>DbQueryResult</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>DbQueryResult node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>GetDatabaseSchemaSchema</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>GetDatabaseSchemaSchema node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>._setup_tools2()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>._setup_tools2() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>llm_utils.py</code><br><small style="color:var(--muted)">utils/llm_utils.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td><code>langchain_agent5.py</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>Module file in utils/llm_utils.py.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>get_resilient_llm()</code><br><small style="color:var(--muted)">utils/llm_utils.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>langchain_agent5.py</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>get_resilient_llm() node in utils/llm_utils.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>langchain_agent5.py</code></td><td>10 nodes</td></tr>
+<tr><td><code>utils/llm_utils.py</code></td><td>2 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x9, inherits x8, imports x1, imports x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 5. Langchain Agent5Py Database ====== -->
+<h2 id="langchain-agent5py-database">5. Langchain Agent5Py Database</h2>
+<p>Langchain Agent5Py Database groups implementation around langchain, agent5py, database, list, mostly in langchain_agent5.py. This section covers 12 nodes and 12 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Langchain Agent5Py Database (12 nodes, 12 edges)
+    langchain_agent5_aiagent_679c27f2("AIAgent<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_init_a30fae02("__init__()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_ensure_database_022f4b72("_ensure_database()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_get_database_schema_10d269a2("get_database_schema()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_list_available_database_30135cfa("list_available_databases()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_list_files_49038177("list_files()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_read_file_6c848093("read_file()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_setup_tools_01c288bf("_setup_tools()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_suggest_interesting_que_332f5455("suggest_interesting_queries()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_rationale_211_98b14713("List only .db files in the working dire...<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_rationale_181_50fa1aaa("Read the contents of a file. Use when:...<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_rationale_360_135bcbd7("Safely retrieve table schemas (CREATE T...<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_ensure_database_022f4b72
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_get_database_schema_10d269a2
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_init_a30fae02
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_list_available_database_30135cfa
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_list_files_49038177
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_read_file_6c848093
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_setup_tools_01c288bf
+    langchain_agent5_aiagent_679c27f2 -->|method| langchain_agent5_aiagent_suggest_interesting_que_332f5455
+    langchain_agent5_aiagent_init_a30fae02 -->|calls| langchain_agent5_aiagent_ensure_database_022f4b72
+    class langchain_agent5_aiagent_679c27f2 klass;
+    class langchain_agent5_aiagent_init_a30fae02 function;
+    class langchain_agent5_aiagent_ensure_database_022f4b72 function;
+    class langchain_agent5_aiagent_get_database_schema_10d269a2 function;
+    class langchain_agent5_aiagent_list_available_database_30135cfa function;
+    class langchain_agent5_aiagent_list_files_49038177 function;
+    class langchain_agent5_aiagent_read_file_6c848093 function;
+    class langchain_agent5_aiagent_setup_tools_01c288bf function;
+    class langchain_agent5_aiagent_suggest_interesting_que_332f5455 function;
+    class langchain_agent5_rationale_211_98b14713 concept;
+    class langchain_agent5_rationale_181_50fa1aaa concept;
+    class langchain_agent5_rationale_360_135bcbd7 concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>__init__()</code><br><small style="color:var(--muted)">langchain_agent5.py</small><br><code>_ensure_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small><br><code>_setup_tools()</code><br><small style="color:var(--muted)">langchain_agent5.py</small><br>+5 more</td>
+  <td>AIAgent node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>.__init__()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><code>_ensure_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>.__init__() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>._ensure_database()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>__init__()</code><br><small style="color:var(--muted)">langchain_agent5.py</small><br><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>._ensure_database() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>._setup_tools()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>._setup_tools() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>.read_file()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.read_file() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>.list_files()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.list_files() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>.list_available_databases()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.list_available_databases() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>.suggest_interesting_queries()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.suggest_interesting_queries() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>.get_database_schema()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>AIAgent</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.get_database_schema() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>Read the contents of a file.              Use when:             - The user asks</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Read the contents of a file.              Use when:             - The user asks.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>List only .db files in the working directory.</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for List only .db files in the working directory..</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>Safely retrieve table schemas (CREATE TABLE statements) for a database file.</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Safely retrieve table schemas (CREATE TABLE statements) for a database file..</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>langchain_agent5.py</code></td><td>12 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: method x8, explains x3, calls x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 6. Langchain Agent5Py String ====== -->
+<h2 id="langchain-agent5py-string">6. Langchain Agent5Py String</h2>
+<p>Langchain Agent5Py String groups implementation around langchain, agent5py, string, sql, mostly in langchain_agent5.py. This section covers 5 nodes and 4 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Langchain Agent5Py String (5 nodes, 4 edges)
+    langchain_agent5_sqlguardrail_bac716d7("SQLGuardrail<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_sqlguardrail_clean_raw_llm_stri_81523505("_clean_raw_llm_string()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_sqlguardrail_validate_and_optim_0a61c3b6("validate_and_optimize()<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_rationale_521_0b971403("Parses and verifies the AST of a genera...<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_rationale_501_4b17827b("Strips markdown code fences, leading 's...<br/><small>langchain_agent5.py</small>")
+    langchain_agent5_sqlguardrail_bac716d7 -->|method| langchain_agent5_sqlguardrail_clean_raw_llm_stri_81523505
+    langchain_agent5_sqlguardrail_bac716d7 -->|method| langchain_agent5_sqlguardrail_validate_and_optim_0a61c3b6
+    class langchain_agent5_sqlguardrail_bac716d7 klass;
+    class langchain_agent5_sqlguardrail_clean_raw_llm_stri_81523505 function;
+    class langchain_agent5_sqlguardrail_validate_and_optim_0a61c3b6 function;
+    class langchain_agent5_rationale_521_0b971403 concept;
+    class langchain_agent5_rationale_501_4b17827b concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>SQLGuardrail</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_clean_raw_llm_string()</code><br><small style="color:var(--muted)">langchain_agent5.py</small><br><code>validate_and_optimize()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>SQLGuardrail node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>._clean_raw_llm_string()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>SQLGuardrail</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>._clean_raw_llm_string() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>.validate_and_optimize()</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>SQLGuardrail</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.validate_and_optimize() node in langchain_agent5.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>Strips markdown code fences, leading &#x27;sql&#x27; blocks, and extra whitespace.</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Strips markdown code fences, leading &#x27;sql&#x27; blocks, and extra whitespace..</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>Parses and verifies the AST of a generated SQL string.         Returns a dict in</code><br><small style="color:var(--muted)">langchain_agent5.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Parses and verifies the AST of a generated SQL string.         Returns a dict in.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>langchain_agent5.py</code></td><td>5 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: method x2, explains x2. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 7. Prompt Loaderpy Utils ====== -->
+<h2 id="prompt-loaderpy-utils">7. Prompt Loaderpy Utils</h2>
+<p>Prompt Loaderpy Utils groups implementation around prompt, loaderpy, utils, load, mostly in utils/prompt_loader.py. This section covers 3 nodes and 3 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Prompt Loaderpy Utils (3 nodes, 3 edges)
+    utils_prompt_loader_load_all_prompts_6f9df347("_load_all_prompts()<br/><small>utils/prompt_loader.py</small>")
+    utils_prompt_loader_load_prompt_49243d5f("load_prompt()<br/><small>utils/prompt_loader.py</small>")
+    utils_prompt_loader_7b4dd0dd("prompt_loader.py")
+    utils_prompt_loader_load_all_prompts_6f9df347 -->|calls| utils_prompt_loader_load_prompt_49243d5f
+    class utils_prompt_loader_load_all_prompts_6f9df347 function;
+    class utils_prompt_loader_load_prompt_49243d5f function;
+    class utils_prompt_loader_7b4dd0dd module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>prompt_loader.py</code><br><small style="color:var(--muted)">utils/prompt_loader.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in utils/prompt_loader.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>_load_all_prompts()</code><br><small style="color:var(--muted)">utils/prompt_loader.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>load_prompt()</code><br><small style="color:var(--muted)">utils/prompt_loader.py</small></td>
+  <td>Builds structured prompts for model calls.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>load_prompt()</code><br><small style="color:var(--muted)">utils/prompt_loader.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>_load_all_prompts()</code><br><small style="color:var(--muted)">utils/prompt_loader.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>Builds structured prompts for model calls.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>utils/prompt_loader.py</code></td><td>3 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x2, calls x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<h2 id="hyperedges">Group Relationships (Hyperedges)</h2>
+<div class="grid">
+
+  <div class="card">
+    <h4>Graphify Ecosystem</h4>
+    <p><code>participate_in</code> — 3 participants</p>
+    <ul>
+      <li><code>claude_md</code></li>
+      <li><code>claude_skills_graphify_skill_md</code></li>
+      <li><code>requirements_txt</code></li>
+    </ul>
+  </div>
+</div>
+<hr>
+<h2 id="stats">Project Statistics</h2>
+
+<div class="grid">
+  <div class="card">
+    <h4>Graph</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><td>Nodes</td><td>58</td></tr>
+      <tr><td>Edges</td><td>92</td></tr>
+      <tr><td>Hyperedges</td><td>1</td></tr>
+      <tr><td>Communities</td><td>9</td></tr>
+      <tr><td>Documented Sections</td><td>6</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Edge Confidence</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><td>EXTRACTED</td><td>82</td></tr>
+      <tr><td>INFERRED</td><td>10</td></tr>
+      <tr><td>AMBIGUOUS</td><td>0</td></tr>
+    </table>
+  </div>
+</div>
+
+<div style="text-align:center; padding:40px 0; color: var(--muted); font-size:0.9rem;">
+  <p>ReAct_Agent — Architecture Documentation</p>
+  <p>Generated: 2026-07-01 13:20 UTC · graphify callflow-html</p>
+</div>
+
+</div><!-- .container -->
+
+<script>
+(function () {
+  const mermaidConfig = {
+    startOnLoad: false,
+    theme: 'dark',
+    securityLevel: 'loose',
+    flowchart: { htmlLabels: true, useMaxWidth: true },
+    themeVariables: {
+      primaryColor: '#1e293b',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#38bdf8',
+      secondaryColor: '#0f172a',
+      tertiaryColor: '#334155',
+      lineColor: '#64748b',
+      textColor: '#e2e8f0',
+    }
+  };
+
+  mermaid.initialize(mermaidConfig);
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function enhanceMermaidDiagrams() {
+    document.querySelectorAll('.mermaid').forEach((container) => {
+      if (container.dataset.zoomReady === 'true') return;
+      const svg = container.querySelector('svg');
+      if (!svg) return;
+
+      container.dataset.zoomReady = 'true';
+      container.classList.add('is-enhanced');
+
+      const viewport = document.createElement('div');
+      viewport.className = 'mermaid-viewport';
+      svg.parentNode.insertBefore(viewport, svg);
+      viewport.appendChild(svg);
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'mermaid-toolbar';
+      toolbar.innerHTML = [
+        '<button type="button" data-action="zoom-out" title="Zoom out">-</button>',
+        '<span class="zoom-level" data-role="level">100%</span>',
+        '<button type="button" data-action="zoom-in" title="Zoom in">+</button>',
+        '<button type="button" data-action="fit" title="Fit width">Fit</button>',
+        '<button type="button" data-action="reset" title="Reset view">Reset</button>'
+      ].join('');
+      container.insertBefore(toolbar, viewport);
+
+      const state = { scale: 1, x: 0, y: 0, dragging: false, startX: 0, startY: 0, originX: 0, originY: 0 };
+      const level = toolbar.querySelector('[data-role="level"]');
+
+      function applyTransform() {
+        svg.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+        level.textContent = `${Math.round(state.scale * 100)}%`;
+      }
+
+      function zoomBy(delta) {
+        state.scale = clamp(state.scale + delta, 0.25, 3);
+        applyTransform();
+      }
+
+      function reset() {
+        state.scale = 1;
+        state.x = 0;
+        state.y = 0;
+        applyTransform();
+      }
+
+      function fitWidth() {
+        const rawWidth = svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width
+          ? svg.viewBox.baseVal.width
+          : svg.getBoundingClientRect().width / state.scale;
+        if (!rawWidth) {
+          reset();
+          return;
+        }
+        state.scale = clamp((viewport.clientWidth - 48) / rawWidth, 0.25, 1.4);
+        state.x = 0;
+        state.y = 0;
+        applyTransform();
+      }
+
+      toolbar.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+        if (action === 'zoom-in') zoomBy(0.15);
+        if (action === 'zoom-out') zoomBy(-0.15);
+        if (action === 'fit') fitWidth();
+        if (action === 'reset') reset();
+      });
+
+      viewport.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        zoomBy(event.deltaY < 0 ? 0.1 : -0.1);
+      }, { passive: false });
+
+      viewport.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        state.dragging = true;
+        state.startX = event.clientX;
+        state.startY = event.clientY;
+        state.originX = state.x;
+        state.originY = state.y;
+        viewport.classList.add('is-dragging');
+        viewport.setPointerCapture(event.pointerId);
+      });
+
+      viewport.addEventListener('pointermove', (event) => {
+        if (!state.dragging) return;
+        state.x = state.originX + event.clientX - state.startX;
+        state.y = state.originY + event.clientY - state.startY;
+        applyTransform();
+      });
+
+      function endDrag(event) {
+        if (!state.dragging) return;
+        state.dragging = false;
+        viewport.classList.remove('is-dragging');
+        if (viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      viewport.addEventListener('pointerup', endDrag);
+      viewport.addEventListener('pointercancel', endDrag);
+      applyTransform();
+    });
+  }
+
+  function renderMermaid() {
+    const result = mermaid.run
+      ? mermaid.run({ querySelector: '.mermaid' })
+      : Promise.resolve();
+    Promise.resolve(result)
+      .then(enhanceMermaidDiagrams)
+      .catch((error) => {
+        console.error('Mermaid render failed:', error);
+        enhanceMermaidDiagrams();
+      });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderMermaid);
+  } else {
+    renderMermaid();
+  }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,204 @@
+{
+  "communities": {
+    "0": [
+      "basemodel",
+      "langchain_agent5",
+      "langchain_agent5_aiagent_setup_tools2",
+      "langchain_agent5_dbqueryresult",
+      "langchain_agent5_getdatabaseschemaschema",
+      "langchain_agent5_listavailabledatabasesschema",
+      "langchain_agent5_listfilesschema",
+      "langchain_agent5_queryanydatabaseschema",
+      "langchain_agent5_querydatabaseschema",
+      "langchain_agent5_readfileschema",
+      "langchain_agent5_suggestqueriesschema",
+      "utils_llm_utils",
+      "utils_llm_utils_get_resilient_llm"
+    ],
+    "1": [
+      "langchain_agent5_aiagent",
+      "langchain_agent5_aiagent_ensure_database",
+      "langchain_agent5_aiagent_get_database_schema",
+      "langchain_agent5_aiagent_init",
+      "langchain_agent5_aiagent_list_available_databases",
+      "langchain_agent5_aiagent_list_files",
+      "langchain_agent5_aiagent_read_file",
+      "langchain_agent5_aiagent_setup_tools",
+      "langchain_agent5_aiagent_suggest_interesting_queries",
+      "langchain_agent5_rationale_181",
+      "langchain_agent5_rationale_211",
+      "langchain_agent5_rationale_360"
+    ],
+    "2": [
+      "app",
+      "app_agentexecutionrequest",
+      "app_execute_agent",
+      "app_get_agent_trace",
+      "app_get_root_interface",
+      "app_get_standalone_agent",
+      "app_rationale_127",
+      "app_rationale_179",
+      "app_rationale_80",
+      "app_serve_telemetry"
+    ],
+    "3": [
+      "any",
+      "langchain_agent5_aiagent_execute_db_query",
+      "langchain_agent5_aiagent_query_any_database",
+      "langchain_agent5_rationale_340",
+      "sqldatabase"
+    ],
+    "4": [
+      "basemessage",
+      "langchain_agent5_aiagent_chat",
+      "langchain_agent5_aiagent_query_database",
+      "langchain_agent5_rationale_334",
+      "langchain_agent5_rationale_381"
+    ],
+    "5": [
+      "langchain_agent5_rationale_501",
+      "langchain_agent5_rationale_521",
+      "langchain_agent5_sqlguardrail",
+      "langchain_agent5_sqlguardrail_clean_raw_llm_string",
+      "langchain_agent5_sqlguardrail_validate_and_optimize"
+    ],
+    "6": [
+      "config_prompts_db_agent",
+      "requirements_txt",
+      "static_telemetry_html"
+    ],
+    "7": [
+      "utils_prompt_loader",
+      "utils_prompt_loader_load_all_prompts",
+      "utils_prompt_loader_load_prompt"
+    ],
+    "8": [
+      "claude_md",
+      "claude_skills_graphify_skill_md"
+    ]
+  },
+  "cohesion": {
+    "0": 0.3333333333333333,
+    "1": 0.18181818181818182,
+    "2": 0.24444444444444444,
+    "3": 0.5,
+    "4": 0.4,
+    "5": 0.4,
+    "6": 0.6666666666666666,
+    "7": 1.0,
+    "8": 1.0
+  },
+  "gods": [
+    {
+      "id": "langchain_agent5_aiagent",
+      "label": "AIAgent",
+      "degree": 17
+    },
+    {
+      "id": "app_agentexecutionrequest",
+      "label": "AgentExecutionRequest",
+      "degree": 4
+    },
+    {
+      "id": "app_execute_agent",
+      "label": "execute_agent()",
+      "degree": 4
+    },
+    {
+      "id": "utils_prompt_loader_load_prompt",
+      "label": "load_prompt()",
+      "degree": 4
+    },
+    {
+      "id": "app_get_standalone_agent",
+      "label": "get_standalone_agent()",
+      "degree": 3
+    },
+    {
+      "id": "langchain_agent5_readfileschema",
+      "label": "ReadFileSchema",
+      "degree": 3
+    },
+    {
+      "id": "langchain_agent5_listfilesschema",
+      "label": "ListFilesSchema",
+      "degree": 3
+    },
+    {
+      "id": "langchain_agent5_querydatabaseschema",
+      "label": "QueryDatabaseSchema",
+      "degree": 3
+    },
+    {
+      "id": "langchain_agent5_suggestqueriesschema",
+      "label": "SuggestQueriesSchema",
+      "degree": 3
+    },
+    {
+      "id": "langchain_agent5_queryanydatabaseschema",
+      "label": "QueryAnyDatabaseSchema",
+      "degree": 3
+    }
+  ],
+  "surprises": [
+    {
+      "source": "Telemetry Dashboard",
+      "target": "Project Requirements",
+      "source_files": [
+        "static/telemetry.html",
+        "requirements.txt"
+      ],
+      "confidence": "INFERRED",
+      "relation": "semantically_similar_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; semantically similar concepts with no structural link"
+    },
+    {
+      "source": "AgentExecutionRequest",
+      "target": "AIAgent",
+      "source_files": [
+        "app.py",
+        "langchain_agent5.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "get_standalone_agent()",
+      "target": "AIAgent",
+      "source_files": [
+        "app.py",
+        "langchain_agent5.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "DB Agent Prompt",
+      "target": "Telemetry Dashboard",
+      "source_files": [
+        "config/prompts.yaml",
+        "static/telemetry.html"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories"
+    },
+    {
+      "source": "Claude Project Rules",
+      "target": "Graphify Skill Definition",
+      "source_files": [
+        "CLAUDE.md",
+        ".claude/skills/graphify/SKILL.md"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories"
+    }
+  ],
+  "tokens": {
+    "input": 34152,
+    "output": 588
+  }
+}

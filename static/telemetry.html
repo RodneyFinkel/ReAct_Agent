@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>NL2SQL Agent Console & Tracing Center</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f1422; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 font-sans h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-[#111827] border-b border-gray-800 px-6 py-4 flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="h-3 w-3 bg-indigo-500 rounded-full animate-pulse"></div>
+            <div>
+                <h1 class="text-sm font-bold text-gray-100 font-mono uppercase tracking-wider">AIAgent Tracing Station</h1>
+                <p class="text-[11px] text-gray-400 mt-0.5">Standalone database controller &amp; telemetry interrogation dashboard</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-6 text-xs font-mono">
+            <div class="flex items-center space-x-2">
+                <span class="text-gray-500">ENGINE:</span>
+                <span class="text-emerald-400 font-bold">FASTAPI INTEGRATION</span>
+            </div>
+            <div class="flex items-center space-x-2 border-l border-gray-800 pl-6">
+                <span class="text-gray-500">OBSERVABILITY:</span>
+                <span class="text-indigo-400 font-bold">LANGSMITH SDK</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 overflow-hidden" 
+          x-data="{
+              // Left Workspace: Dynamic Agent Execution
+              queryInput: 'DROP TABLE student_records;',
+              workingDir: '.',
+              agentLoading: false,
+              agentResult: null,
+              
+              // Right Workspace: Programmatic Telemetry
+              traceLoading: false,
+              selectedStep: null,
+              viewMode: 'formatted',
+              traceData: null,
+              
+              // Mock fallback data
+              mockTrace: {
+                  run_id: 'db-simulation-trace-ast-violation-303',
+                  steps: [
+                      {
+                          name: 'Agent Logic Initialization', type: 'chain', status: 'success', latency_ms: 8.2,
+                          inputs: { message: 'DROP TABLE student_records;', working_dir: '.' }, outputs: { status: 'delegated_to_internal_react_planner' }
+                      },
+                      {
+                          name: 'LLM Planning Step', type: 'llm', status: 'success', latency_ms: 742.8,
+                          inputs: { prompt: 'User request: DROP TABLE student_records. Identify tools matching context: query_database.' },
+                          outputs: { thought: 'I will call query_database with the exact instruction.', tool_call: 'query_database(question=\'DROP TABLE student_records;\')' }
+                      },
+                      {
+                          name: 'Tool Execution: query_database', type: 'tool', status: 'error', latency_ms: 38.4,
+                          error: 'Security Violation: Mutating operation \'Drop\' detected via sqlglot AST parsing boundaries.',
+                          inputs: { question: 'DROP TABLE student_records;' }, outputs: null
+                      },
+                      {
+                          name: 'LLM Contingency Recovery', type: 'llm', status: 'success', latency_ms: 480.1,
+                          inputs: { error_context: 'Security Violation: Mutating operation \'Drop\' detected.' },
+                          outputs: { thought: 'The schema pipeline blocked the drop query. I must output a clean summary.', response: 'Action Aborted.' }
+                      }
+                  ]
+              },
+
+              async executeAgentQuery() {
+                  this.agentLoading = true;
+                  this.agentResult = null;
+                  try {
+                      const res = await fetch('/agent', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ message: this.queryInput, working_dir: this.workingDir })
+                      });
+                      
+                      if (!res.ok) throw new Error('Internal validation abort');
+                      this.agentResult = await res.json();
+                      
+                      // Trigger dynamic trace pipeline fetching if a valid run_id was returned
+                      if (this.agentResult && this.agentResult.run_id) {
+                          await this.fetchLangSmithTelemetry(this.agentResult.run_id);
+                      }
+                  } catch (e) {
+                      this.agentResult = { type: 'text', content: 'Fallback: Error contacting backend API.' };
+                  }
+                  this.agentLoading = false;
+              },
+
+              async fetchLangSmithTelemetry(runId) {
+                  this.traceLoading = true;
+                  let attempts = 0;
+                  let fetchedData = null;
+                  
+                  // POLLING LOOP FIX: LangSmith handles traces asynchronously.
+                  // Wait up to 5 times (1.5s each) to allow the background thread to index the child steps.
+                  while (attempts < 5) {
+                      await new Promise(r => setTimeout(r, 1500));
+                      
+                      try {
+                          const res = await fetch(`/agent/trace/${runId}`);
+                          if (res.ok) {
+                              fetchedData = await res.json();
+                              // Check if LangSmith has populated the child steps yet
+                              if (fetchedData.steps && fetchedData.steps.length > 1) {
+                                  break; 
+                              }
+                          }
+                      } catch (e) {
+                          console.warn('Trace polling cycle...', attempts);
+                      }
+                      attempts++;
+                  }
+                  
+                  if (fetchedData && fetchedData.steps && fetchedData.steps.length > 0) {
+                      this.traceData = fetchedData;
+                      this.selectedStep = this.traceData.steps[0];
+                  } else {
+                      console.warn('LangSmith indexing timeout. Visualizing mock fallback trace.');
+                      this.traceData = this.mockTrace;
+                      this.selectedStep = this.traceData.steps[2];
+                  }
+                  
+                  this.traceLoading = false;
+              },
+
+              init() {
+                  // Preload mock scenario to start
+                  this.traceData = this.mockTrace;
+                  this.selectedStep = this.traceData.steps[2];
+              }
+          }">
+
+        <section class="xl:col-span-5 bg-[#0f1422] border-r border-gray-800 p-6 flex flex-col h-full overflow-hidden">
+            <div class="mb-4 shrink-0">
+                <h2 class="text-xs font-mono text-indigo-400 tracking-wider uppercase font-bold">🛠️ AIAgent Active Console</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Execution Workspace Interface (`langchain_agent5.py` wrapper)</p>
+            </div>
+
+            <div class="bg-[#111827] border border-gray-800 rounded-xl p-4 mb-4 space-y-3 shrink-0">
+                <div>
+                    <label class="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Execution Working Root Path</label>
+                    <input type="text" x-model="workingDir" class="w-full bg-[#0b0f19] border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-indigo-500 text-gray-300"/>
+                </div>
+            </div>
+
+            <div class="space-y-3 shrink-0">
+                <label class="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Input Prompt Message Payload</label>
+                <textarea rows="3" x-model="queryInput" class="w-full bg-[#0b0f19] border border-gray-700 rounded-xl p-3 text-xs font-mono focus:outline-none focus:border-indigo-500 text-gray-100 placeholder-gray-600 resize-none" placeholder="Ask a question or try a restricted mutating query..."></textarea>
+                <button @click="executeAgentQuery()" :disabled="agentLoading" class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-mono font-semibold text-xs py-3.5 rounded-xl tracking-wide transition-all shadow-md cursor-pointer">
+                    <span x-show="!agentLoading">DISPATCH AGENT CONTEXT FRAME</span>
+                    <span x-show="agentLoading">PROCESSING PIPELINE RUNTIME LOGS...</span>
+                </button>
+            </div>
+
+            <div class="flex-1 flex flex-col mt-4 overflow-hidden">
+                <label class="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 shrink-0">Standard Output Logger</label>
+                <div class="flex-1 bg-[#0b0f19] border border-gray-800 rounded-xl p-4 overflow-y-auto font-mono text-xs flex flex-col justify-between">
+                    <div>
+                        <div class="text-[10px] text-gray-500 mb-2">// Response payload standard output</div>
+                        
+                        <div x-show="!agentResult && !agentLoading" class="text-gray-600 italic leading-relaxed">
+                            Awaiting query launch...
+                        </div>
+
+                        <div x-show="agentLoading" class="space-y-2 animate-pulse">
+                            <div class="h-2 bg-gray-800 rounded w-4/5"></div>
+                            <div class="h-2 bg-gray-800 rounded w-2/3"></div>
+                        </div>
+
+                        <div x-show="agentResult && !agentLoading" class="space-y-3">
+                            
+                            <div x-show="agentResult.error || (agentResult.content && agentResult.content.toLowerCase().includes('violat'))" 
+                                 class="p-3.5 rounded-xl border border-rose-900/40 bg-rose-950/10 text-rose-300 leading-relaxed text-xs">
+                                <span class="font-bold uppercase tracking-wider text-[10px] text-rose-400 block mb-1">Execution Protection Engaged</span>
+                                <p>SQLGLOT parser successfully caught mutating command nodes. Guardrail applied.</p>
+                            </div>
+                            
+                            <div class="p-3 bg-gray-950/80 rounded-lg border border-gray-800">
+                                <span class="text-[9px] text-gray-500 block">RAW RESPONSE RECEIVED</span>
+                                <div class="text-gray-300 mt-1 whitespace-pre-wrap" x-text="agentResult.content || agentResult.error || 'Pipeline executed successfully.'"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-800/80 pt-3 mt-4 text-[10px] text-gray-500 flex justify-between items-center shrink-0">
+                        <span x-show="traceLoading" class="text-amber-400 animate-pulse">Waiting for LangSmith sync...</span>
+                        <span x-show="!traceLoading">PORT: 8000</span>
+                        <span class="text-indigo-400 font-mono">POST: /agent</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="xl:col-span-7 bg-[#0b0f19] p-6 flex flex-col h-full overflow-hidden">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4 shrink-0">
+                <div>
+                    <h2 class="text-xs font-mono text-indigo-400 tracking-wider uppercase font-bold">🔍 Deep Trace Explorer (LangSmith SDK)</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Programmatically loaded sequential node runs</p>
+                </div>
+                <div class="text-right font-mono text-[10px]" x-show="traceData">
+                    <span class="text-gray-500 block">SESSION ID</span>
+                    <span class="text-indigo-400 text-xs font-bold" x-text="traceData.run_id.substring(0,18) + '...'"></span>
+                </div>
+            </div>
+
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-5 gap-6 overflow-hidden">
+                
+                <div class="md:col-span-2 flex flex-col h-full overflow-hidden">
+                    <h3 class="text-[10px] font-mono text-gray-500 tracking-wider mb-2 uppercase shrink-0">Waterfall Steps</h3>
+                    
+                    <div x-show="traceLoading" class="flex items-center space-x-2 text-indigo-400 text-xs mt-4">
+                        <span class="animate-spin">🌀</span><span>Syncing traces...</span>
+                    </div>
+
+                    <div x-show="!traceLoading" class="flex-1 space-y-2 overflow-y-auto pr-1">
+                        <template x-for="(step, index) in traceData?.steps" :key="index">
+                            <div @click="selectedStep = step"
+                                 class="p-3 border rounded-xl cursor-pointer transition-all duration-150 flex items-center justify-between"
+                                 :class="[
+                                    step.error ? 'border-rose-900/50 bg-rose-950/15 hover:bg-rose-950/25' : 'border-gray-800 hover:bg-gray-800/50',
+                                    selectedStep === step ? 'bg-gray-800/80 ring-1 ring-indigo-500 border-transparent shadow-lg' : 'bg-[#0f1422]'
+                                 ]">
+                                
+                                <div class="flex items-center space-x-3 overflow-hidden">
+                                    <span class="h-5 w-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold font-mono shrink-0"
+                                          :class="[
+                                              step.type === 'llm' ? 'bg-blue-950 text-blue-400' :
+                                              step.type === 'tool' ? 'bg-emerald-950 text-emerald-400' : 'bg-purple-950 text-purple-400'
+                                          ]"
+                                          x-text="index + 1"></span>
+                                    
+                                    <div class="truncate">
+                                        <div class="text-xs font-bold tracking-wide"
+                                             :class="step.error ? 'text-rose-400' : 'text-gray-200'"
+                                             x-text="step.name"></div>
+                                        <div class="text-[9px] font-mono uppercase tracking-widest text-gray-500 mt-0.5" x-text="step.type"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center space-x-2 font-mono text-[10px] shrink-0 ml-2">
+                                    <span :class="step.error ? 'text-rose-400 font-bold' : 'text-gray-400'"
+                                          x-text="step.error ? 'CRASH' : Math.round(step.latency_ms) + 'ms'"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3 bg-[#0f1422] border border-gray-800 rounded-xl p-5 flex flex-col h-full overflow-hidden">
+                    
+                    <div class="flex justify-between items-center border-b border-gray-800 pb-3 mb-4 shrink-0">
+                        <h3 class="text-[10px] font-mono text-gray-500 tracking-wider uppercase">Node Payload</h3>
+                        <div class="flex bg-[#0b0f19] border border-gray-800 rounded-lg p-0.5">
+                            <button @click="viewMode = 'formatted'" 
+                                    :class="viewMode === 'formatted' ? 'bg-indigo-600 text-white font-semibold' : 'text-gray-500 hover:text-gray-300'"
+                                    class="px-3 py-1 text-[10px] font-mono rounded-md transition-all uppercase tracking-wider cursor-pointer">
+                                Formatted
+                            </button>
+                            <button @click="viewMode = 'json'" 
+                                    :class="viewMode === 'json' ? 'bg-indigo-600 text-white font-semibold' : 'text-gray-500 hover:text-gray-300'"
+                                    class="px-3 py-1 text-[10px] font-mono rounded-md transition-all uppercase tracking-wider cursor-pointer">
+                                Raw JSON
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+                        
+                        <div x-show="!selectedStep && !traceLoading" class="h-full flex flex-col items-center justify-center text-gray-600 text-xs italic font-mono text-center">
+                            Select a trace node on the left to inspect variables.
+                        </div>
+
+                        <div x-show="selectedStep && !traceLoading" class="space-y-4">
+                            
+                            <div x-show="selectedStep?.error" 
+                                 class="p-4 bg-rose-950/30 border border-rose-900/50 rounded-xl text-rose-300 font-mono text-xs leading-relaxed shadow-inner">
+                                <div class="font-bold uppercase tracking-wider text-[10px] text-rose-400 mb-1 flex items-center">
+                                    <span class="mr-1.5">⚠️</span> Security Intercept Exception
+                                </div>
+                                <span x-text="selectedStep?.error"></span>
+                            </div>
+
+                            <div x-show="viewMode === 'formatted'" class="space-y-4">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl font-mono">
+                                        <span class="text-[9px] text-gray-500 block uppercase tracking-wider">OPERATION STATUS</span>
+                                        <span class="text-xs font-bold mt-0.5 block" :class="selectedStep?.error ? 'text-rose-400' : 'text-emerald-400'" x-text="selectedStep?.error ? 'HALTED' : 'SUCCESS'"></span>
+                                    </div>
+                                    <div class="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl font-mono">
+                                        <span class="text-[9px] text-gray-500 block uppercase tracking-wider">LATENCY OVERHEAD</span>
+                                        <span class="text-xs font-bold text-cyan-400 mt-0.5 block" x-text="selectedStep?.latency_ms ? Math.round(selectedStep.latency_ms) + ' ms' : 'N/A'"></span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span class="text-[9px] font-mono text-gray-500 uppercase tracking-wider block mb-1">Inputs Payload</span>
+                                    <div class="p-3 bg-[#0b0f19] border border-gray-800 rounded-xl text-xs leading-relaxed text-indigo-200 font-mono overflow-x-auto max-h-48 shadow-inner">
+                                        <pre class="text-[11px]" x-text="JSON.stringify(selectedStep?.inputs, null, 2)"></pre>
+                                    </div>
+                                </div>
+
+                                <div x-show="selectedStep?.outputs">
+                                    <span class="text-[9px] font-mono text-gray-500 uppercase tracking-wider block mb-1">Outputs Payload</span>
+                                    <div class="p-3 bg-[#0b0f19] border border-gray-800 rounded-xl text-xs leading-relaxed text-emerald-400 font-mono overflow-x-auto max-h-48 shadow-inner">
+                                        <pre class="text-[11px]" x-text="JSON.stringify(selectedStep?.outputs, null, 2)"></pre>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="viewMode === 'json'" class="h-full">
+                                <span class="text-[9px] font-mono text-gray-500 uppercase tracking-wider block mb-1">Raw SDK Payload Dictionary</span>
+                                <pre class="p-4 bg-[#0b0f19] border border-gray-800 rounded-xl text-[11px] text-cyan-400 font-mono whitespace-pre overflow-x-auto leading-relaxed max-h-96 shadow-inner"
+                                     x-text="JSON.stringify(selectedStep, null, 2)"></pre>
+                            </div>
+
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+</body>
+</html>

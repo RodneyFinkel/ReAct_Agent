@@ -37,83 +37,78 @@
 
     <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 overflow-hidden" 
           x-data="{
-    // Left Workspace: Dynamic Agent Execution
-    queryInput: '',
-    workingDir: '.',
-    agentLoading: false,
-    agentResult: null,
-    
-    // Right Workspace: Programmatic Telemetry
-    traceLoading: false,
-    selectedStep: null,
-    viewMode: 'formatted',
-    traceData: null,
-    
-    async executeAgentQuery() {
-        this.agentLoading = true;
-        this.agentResult = null;
-        try {
-            const res = await fetch('/agent', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: this.queryInput, working_dir: this.workingDir })
-            });
-            
-            if (!res.ok) throw new Error('Internal validation abort');
-            this.agentResult = await res.json();
-            
-            // Trigger dynamic trace pipeline fetching if a valid run_id was returned
-            if (this.agentResult && this.agentResult.run_id) {
-                await this.fetchLangSmithTelemetry(this.agentResult.run_id);
-            }
-        } catch (e) {
-            this.agentResult = { type: 'text', content: 'Fallback: Error contacting backend API.' };
-        }
-        this.agentLoading = false;
-    },
+              // Left Workspace: Dynamic Agent Execution
+              queryInput: '',
+              workingDir: '.',
+              agentLoading: false,
+              agentResult: null,
+              
+              // Right Workspace: Programmatic Telemetry
+              traceLoading: false,
+              selectedStep: null,
+              viewMode: 'formatted',
+              traceData: null,
+              
+              async executeAgentQuery() {
+                  this.agentLoading = true;
+                  this.agentResult = null;
+                  this.traceData = null; // Clear previous traces
+                  this.selectedStep = null;
+                  try {
+                      const res = await fetch('/agent', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ message: this.queryInput, working_dir: this.workingDir })
+                      });
+                      
+                      if (!res.ok) throw new Error('Internal validation abort');
+                      this.agentResult = await res.json();
+                      
+                      if (this.agentResult && this.agentResult.run_id) {
+                          await this.fetchLangSmithTelemetry(this.agentResult.run_id);
+                      }
+                  } catch (e) {
+                      this.agentResult = { type: 'text', content: 'Fallback: Error contacting backend API.' };
+                  }
+                  this.agentLoading = false;
+              },
 
-    
-
-    async fetchLangSmithTelemetry(runId) {
-        this.traceLoading = true;
-        let attempts = 0;
-        let fetchedData = null;
-        
-        // Polling Loop: Wait up to 8 times (1.5s each) to allow background thread indexing
-        while (attempts < 8) {
-            await new Promise(r => setTimeout(r, 1500));
-            
-            try {
-                const res = await fetch(`/agent/trace/${runId}`);
-                if (res.ok) {
-                    fetchedData = await res.json();
-                    // Check if LangSmith has populated the child steps yet
-                    if (fetchedData.steps && fetchedData.steps.length > 1) {
-                        break; 
+                async fetchLangSmithTelemetry(runId) {
+                    this.traceLoading = true;
+                    let attempts = 0;
+                    
+                    while (attempts < 15) { // Increased to 15 attempts (30 seconds) to give LangSmith more time
+                        await new Promise(r => setTimeout(r, 2000));
+                        
+                        try {
+                            const res = await fetch(`/agent/trace/${runId}`);
+                            if (res.ok) {
+                                // 1. Immediately bind the response to Alpine's reactive scope
+                                this.traceData = await res.json();
+                                
+                                // 2. Evaluate against the reactive variable
+                                if (this.traceData.status !== 'pending' && this.traceData.steps && this.traceData.steps.length > 0) {
+                                    this.selectedStep = this.traceData.steps[0];
+                                    break; 
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Trace polling cycle error...', e);
+                        }
+                        attempts++;
                     }
+                    
+                    // 3. Handle the final timeout state gracefully
+                    if (!this.traceData || !this.traceData.steps || this.traceData.steps.length === 0) {
+                        console.warn('LangSmith indexed the parent run, but child steps timed out or are empty.');
+                        this.selectedStep = null;
+                    }
+                    
+                    this.traceLoading = false;
                 }
-            } catch (e) {
-                console.warn('Trace polling cycle...', attempts);
-            }
-            attempts++;
-        }
-        
-        // Apply whatever data we managed to fetch, even if partial
-        if (fetchedData) {
-            if (fetchedData.steps && fetchedData.steps.length === 0) {
-                 console.warn('LangSmith indexed the parent run, but child steps timed out or are empty.');
-            }
-            this.traceData = fetchedData;
-            this.selectedStep = fetchedData.steps.length > 0 ? this.traceData.steps[0] : null;
-        } else {
-            console.error('LangSmith fetching failed completely.');
-            this.traceData = null;
-            this.selectedStep = null;
-        }
-        
-        this.traceLoading = false;
-    }
-}">
+
+              
+          }">
 
         <section class="xl:col-span-5 bg-[#0f1422] border-r border-gray-800 p-6 flex flex-col h-full overflow-hidden">
             <div class="mb-4 shrink-0">
@@ -137,43 +132,95 @@
                 </button>
             </div>
 
+            
+
+
             <div class="flex-1 flex flex-col mt-4 overflow-hidden">
-                <label class="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 shrink-0">Standard Output Logger</label>
-                <div class="flex-1 bg-[#0b0f19] border border-gray-800 rounded-xl p-4 overflow-y-auto font-mono text-xs flex flex-col justify-between">
-                    <div>
-                        <div class="text-[10px] text-gray-500 mb-2">// Response payload standard output</div>
-                        
-                        <div x-show="!agentResult && !agentLoading" class="text-gray-600 italic leading-relaxed">
-                            Awaiting query launch...
-                        </div>
+    <label class="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 shrink-0">
+        Standard Output Logger
+    </label>
+    
+    <div class="flex-1 bg-[#0b0f19] border border-gray-800 rounded-xl p-4 overflow-y-auto font-mono text-xs flex flex-col">
+        <div class="text-[10px] text-gray-500 mb-3">// Response payload</div>
 
-                        <div x-show="agentLoading" class="space-y-2 animate-pulse">
-                            <div class="h-2 bg-gray-800 rounded w-4/5"></div>
-                            <div class="h-2 bg-gray-800 rounded w-2/3"></div>
-                        </div>
+        <!-- Loading -->
+        <div x-show="agentLoading" class="space-y-2 animate-pulse flex-1">
+            <div class="h-2 bg-gray-800 rounded w-3/4"></div>
+            <div class="h-2 bg-gray-800 rounded w-1/2"></div>
+        </div>
 
-                        <div x-show="agentResult && !agentLoading" class="space-y-3">
-                            
-                            <div x-show="agentResult.error || (agentResult.content && agentResult.content.toLowerCase().includes('violat'))" 
-                                 class="p-3.5 rounded-xl border border-rose-900/40 bg-rose-950/10 text-rose-300 leading-relaxed text-xs">
-                                <span class="font-bold uppercase tracking-wider text-[10px] text-rose-400 block mb-1">Execution Protection Engaged</span>
-                                <p>SQLGLOT parser successfully caught mutating command nodes. Guardrail applied.</p>
-                            </div>
-                            
-                            <div class="p-3 bg-gray-950/80 rounded-lg border border-gray-800">
-                                <span class="text-[9px] text-gray-500 block">RAW RESPONSE RECEIVED</span>
-                                <div class="text-gray-300 mt-1 whitespace-pre-wrap" x-text="agentResult.content || agentResult.error || 'Pipeline executed successfully.'"></div>
-                            </div>
-                        </div>
-                    </div>
+        <!-- No result yet -->
+        <div x-show="!agentResult && !agentLoading" class="text-gray-600 italic flex-1 flex items-center justify-center">
+            Awaiting query launch...
+        </div>
 
-                    <div class="border-t border-gray-800/80 pt-3 mt-4 text-[10px] text-gray-500 flex justify-between items-center shrink-0">
-                        <span x-show="traceLoading" class="text-amber-400 animate-pulse">Waiting for LangSmith sync...</span>
-                        <span x-show="!traceLoading">PORT: 8000</span>
-                        <span class="text-indigo-400 font-mono">POST: /agent</span>
-                    </div>
+        <!-- Text / Error Response -->
+        <div x-show="agentResult?.type === 'text' && !agentLoading" class="flex-1">
+            <div class="p-4 bg-gray-950/80 rounded-lg border border-gray-700 text-gray-300 whitespace-pre-wrap"
+                 x-text="agentResult.content || 'No content'">
+            </div>
+        </div>
+
+        <!-- DB Query Result -->
+        <div x-show="agentResult?.type === 'db_result' && !agentLoading" class="flex-1 flex flex-col space-y-4 overflow-hidden">
+
+            <!-- Status -->
+            <div class="flex items-center gap-2">
+                <span class="px-3 py-1 text-xs font-bold rounded-full bg-emerald-900 text-emerald-400"
+                      x-text="agentResult.error ? 'ERROR' : 'QUERY SUCCESS'">
+                </span>
+                <span class="text-emerald-400 text-xs" x-text="agentResult.row_count + ' rows returned'"></span>
+            </div>
+
+            <!-- SQL Query -->
+            <div>
+                <span class="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">Generated SQL</span>
+                <pre class="bg-[#111827] border border-gray-700 p-3 rounded-xl text-blue-300 text-[11px] overflow-x-auto"
+                     x-text="agentResult.sql"></pre>
+            </div>
+
+            <!-- Results Table -->
+            <div x-show="agentResult.columns && agentResult.columns.length > 0">
+                <span class="text-[10px] text-gray-400 uppercase tracking-wider block mb-2">Query Results (Preview)</span>
+                <div class="overflow-x-auto border border-gray-700 rounded-xl bg-[#111827]">
+                    <table class="min-w-full text-xs">
+                        <thead>
+                            <tr class="border-b border-gray-700">
+                                <template x-for="col in agentResult.columns" :key="col">
+                                    <th class="px-3 py-2 text-left font-mono text-gray-400" x-text="col"></th>
+                                </template>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800">
+                            <template x-for="(row, i) in agentResult.rows_preview" :key="i">
+                                <tr class="hover:bg-gray-800/50">
+                                    <template x-for="(cell, j) in row" :key="j">
+                                        <td class="px-3 py-2 text-gray-300 font-mono" 
+                                            x-text="cell !== null ? cell : 'NULL'"></td>
+                                    </template>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
             </div>
+
+            <!-- Parquet File -->
+            <div x-show="agentResult.file_path" class="bg-gray-950 border border-gray-700 rounded-xl p-3">
+                <span class="text-[10px] text-gray-400 block">Full results saved to:</span>
+                <span class="text-emerald-400 font-mono text-xs break-all" 
+                      x-text="agentResult.file_path"></span>
+            </div>
+
+            <!-- Error -->
+            <div x-show="agentResult.error" 
+                 class="p-4 bg-rose-950/30 border border-rose-900 rounded-xl text-rose-300 text-xs">
+                <span class="font-bold">Error:</span> 
+                <span x-text="agentResult.error"></span>
+            </div>
+        </div>
+    </div>
+</div>
         </section>
 
         <section class="xl:col-span-7 bg-[#0b0f19] p-6 flex flex-col h-full overflow-hidden">
@@ -184,7 +231,7 @@
                 </div>
                 <div class="text-right font-mono text-[10px]" x-show="traceData">
                     <span class="text-gray-500 block">SESSION ID</span>
-                    <span class="text-indigo-400 text-xs font-bold" x-text="traceData.run_id.substring(0,18) + '...'"></span>
+                    <span class="text-indigo-400 text-xs font-bold" x-text="traceData?.run_id ? traceData.run_id.substring(0,18) + '...' : ''"></span>
                 </div>
             </div>
 
@@ -198,7 +245,7 @@
                     </div>
 
                     <div x-show="!traceLoading" class="flex-1 space-y-2 overflow-y-auto pr-1">
-                        <template x-for="(step, index) in traceData?.steps" :key="index">
+                        <template x-for="(step, index) in (traceData?.steps || [])" :key="index">
                             <div @click="selectedStep = step"
                                  class="p-3 border rounded-xl cursor-pointer transition-all duration-150 flex items-center justify-between"
                                  :class="[

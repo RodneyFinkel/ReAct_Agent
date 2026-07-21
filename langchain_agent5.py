@@ -21,6 +21,7 @@ import pandas as pd
 import uuid
 import pyarrow as pa
 import pyarrow.parquet as pq
+from langsmith import get_current_run_tree
 
 
 load_dotenv()
@@ -284,7 +285,7 @@ class AIAgent:
             
                
             validated_sql = validation["sql"]   
-
+            print(f"Validated SQL: {validated_sql}")
             results = db._execute(validated_sql)  # returns list of dicts
             
             if not results:
@@ -299,7 +300,8 @@ class AIAgent:
             
             full_rows = [list(row.values()) for row in results]
             # Slice results for Streamlit UI and LangGraoh Pydantic Object AgentState
-            display_rows = full_rows[:50]  # Slice to max 50 rows for Streamlit/UI
+            display_rows = full_rows[:20]  # Slice to max 50 rows for Streamlit/UI
+            print(f"Query returned {len(results)} rows. Displaying first {display_rows} rows.")
             
             # Save FULL dataset to Parquet using pure PyArrow
             file_name = f"query_{uuid.uuid4().hex[:8]}.parquet"
@@ -371,9 +373,7 @@ class AIAgent:
         except Exception as e:
             return f"Error reading schema metadata for '{db_filename}': {str(e)}"
 
-
-   
-    
+ 
 
     # Main chat method React loop
     @traceable(run_type="chain", name="ReAct_Agent_Master_Loop")
@@ -440,43 +440,80 @@ class AIAgent:
                 args = tool_call["args"]
                 tool_id = tool_call["id"]
 
-                if tool_name in ("query_database", "query_any_database"):
-                    # Execute DB query → get structured result
-                    if tool_name == "query_database":
-                        result_dict = self.query_database(**args)
-                    else:
-                        result_dict = self.query_any_database(**args)
+                # if tool_name in ("query_database", "query_any_database"):
+                #     # Execute DB query → get structured result
+                #     if tool_name == "query_database":
+                #         result_dict = self.query_database(**args)
+                #     else:
+                #         result_dict = self.query_any_database(**args)
 
-                    if not result_dict["error"]:
-                        sample_rows = result_dict["rows"][:10]
-                    # Do **NOT** put the full result back into messages
-                    # Only put a short note so the LLM knows something happened
-                        short_note = (
-                            f"Query executed successfully.\n"
-                            f"Total Rows: {result_dict['row_count']}\n"
-                            f"Full data saved to: {result_dict['file_path']}\n"
-                            f"Context Sample (First 10 rows):\n"
-                            f"Columns: {result_dict['columns']}\n"
-                            f"Data: {sample_rows}"
-                        )
-                    else:
-                        short_note = f"Query failed. Error: {result_dict['error']}"
+                #     if not result_dict["error"]:
+                #         sample_rows = result_dict["rows"][:10]
+                #     # Do **NOT** put the full result back into messages
+                #     # Only put a short note so the LLM knows something happened
+                #         short_note = (
+                #             f"Query executed successfully.\n"
+                #             f"Total Rows: {result_dict['row_count']}\n"
+                #             f"Full data saved to: {result_dict['file_path']}\n"
+                #             f"Context Sample (First 10 rows):\n"
+                #             f"Columns: {result_dict['columns']}\n"
+                #             f"Data: {sample_rows}"
+                #         )
+                #     else:
+                #         short_note = f"Query failed. Error: {result_dict['error']}"
+
+                #     self.messages.append(ToolMessage(
+                #         tool_call_id=tool_id,
+                #         content=short_note
+                #     ))
+
+                #     # Return structured result to frontend. DB results have been truncated to 50 in _execute_db_query
+                #     db_output_to_render =  {
+                #         "type": "db_result",
+                #         "result": DbQueryResult(**result_dict) 
+                #     }
+
+                # else:
+                #     # Normal tools → return string result to LLM
+                #     method = getattr(self, tool_name)
+                #     tool_result = method(**args)
+                #     self.messages.append(ToolMessage(
+                #         tool_call_id=tool_id,
+                #         content=str(tool_result)
+                #     ))
+                
+                # Fetch the current run tree established by app.py's collect_runs()
+                parent_run = get_current_run_tree()
+
+                # Define a helper to execute the tool with explicit nesting
+                @traceable(run_type="tool", name=tool_name)
+                def execute_tool_with_context():
+                    method = getattr(self, tool_name)
+                    return method(**args)
+
+                # Execute with context
+                tool_result = execute_tool_with_context()
+
+                if tool_name in ("query_database", "query_any_database"):
+                    # Process structured DB results (ensure result_dict is captured)
+                    result_dict = tool_result 
+                    
+                    short_note = (
+                        f"Query executed successfully.\n"
+                        f"Total Rows: {result_dict.get('row_count', 0)}\n"
+                        f"File saved to: {result_dict.get('file_path', 'N/A')}"
+                    )
 
                     self.messages.append(ToolMessage(
                         tool_call_id=tool_id,
                         content=short_note
                     ))
 
-                    # Return structured result to frontend. DB results have been truncated to 50 in _execute_db_query
-                    db_output_to_render =  {
+                    db_output_to_render = {
                         "type": "db_result",
                         "result": DbQueryResult(**result_dict) 
                     }
-
                 else:
-                    # Normal tools → return string result to LLM
-                    method = getattr(self, tool_name)
-                    tool_result = method(**args)
                     self.messages.append(ToolMessage(
                         tool_call_id=tool_id,
                         content=str(tool_result)

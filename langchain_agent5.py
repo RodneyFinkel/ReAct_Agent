@@ -67,11 +67,6 @@ class GetDatabaseSchemaSchema(BaseModel):
 
 class AIAgent:
     def __init__(self, api_key: str, working_dir: str = "."):
-        # self.llm = ChatGroq(
-        #             groq_api_key=api_key,
-        #             model_name="llama-3.3-70b-versatile",
-        #             temperature=0
-        #         )
         
         self.primary_llm = get_resilient_llm(model_name="llama-3.3-70b-versatile", temperature=0)
         self.fallback_llm = get_resilient_llm(model_name="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0)
@@ -439,48 +434,6 @@ class AIAgent:
                 tool_name = tool_call["name"]
                 args = tool_call["args"]
                 tool_id = tool_call["id"]
-
-                # if tool_name in ("query_database", "query_any_database"):
-                #     # Execute DB query → get structured result
-                #     if tool_name == "query_database":
-                #         result_dict = self.query_database(**args)
-                #     else:
-                #         result_dict = self.query_any_database(**args)
-
-                #     if not result_dict["error"]:
-                #         sample_rows = result_dict["rows"][:10]
-                #     # Do **NOT** put the full result back into messages
-                #     # Only put a short note so the LLM knows something happened
-                #         short_note = (
-                #             f"Query executed successfully.\n"
-                #             f"Total Rows: {result_dict['row_count']}\n"
-                #             f"Full data saved to: {result_dict['file_path']}\n"
-                #             f"Context Sample (First 10 rows):\n"
-                #             f"Columns: {result_dict['columns']}\n"
-                #             f"Data: {sample_rows}"
-                #         )
-                #     else:
-                #         short_note = f"Query failed. Error: {result_dict['error']}"
-
-                #     self.messages.append(ToolMessage(
-                #         tool_call_id=tool_id,
-                #         content=short_note
-                #     ))
-
-                #     # Return structured result to frontend. DB results have been truncated to 50 in _execute_db_query
-                #     db_output_to_render =  {
-                #         "type": "db_result",
-                #         "result": DbQueryResult(**result_dict) 
-                #     }
-
-                # else:
-                #     # Normal tools → return string result to LLM
-                #     method = getattr(self, tool_name)
-                #     tool_result = method(**args)
-                #     self.messages.append(ToolMessage(
-                #         tool_call_id=tool_id,
-                #         content=str(tool_result)
-                #     ))
                 
                 # Fetch the current run tree established by app.py's collect_runs()
                 parent_run = get_current_run_tree()

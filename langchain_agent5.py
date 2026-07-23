@@ -2,6 +2,7 @@ import os
 import sqlite3
 import argparse
 from typing import Dict, Any, List, Optional, Union
+from certifi.__main__ import args
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -172,7 +173,7 @@ class AIAgent:
         
 
     # Tool implementations
-    @traceable(run_type="tool", name="FileSystem_Read")
+   # @traceable(run_type="tool", name="FileSystem_Read")
     def read_file(self, file_path: str) -> str:
         """
             Read the contents of a file.
@@ -193,7 +194,7 @@ class AIAgent:
             return f"Error reading file: {str(e)}"
 
 
-    @traceable(run_type="tool", name="List_Files")
+   # @traceable(run_type="tool", name="List_Files")
     def list_files(self, path: str = ".") -> str:
         full_path = os.path.join(self.working_dir, path)
         try:
@@ -202,7 +203,7 @@ class AIAgent:
             return f"Error listing files: {str(e)}"
  
  
-    @traceable(run_type="tool", name="List_Available_Databases")    
+    #@traceable(run_type="tool", name="List_Available_Databases")    
     def list_available_databases(self, dummy: str = None) -> str:
         """List only .db files in the working directory."""
         try:
@@ -239,7 +240,7 @@ class AIAgent:
             return f"Could not generate suggestions: {str(e)}"
         
 
-    @traceable(run_type="chain", name="Core_DB_Execution_Engine")
+    #@traceable(run_type="chain", name="Core_DB_Execution_Engine")
     def _execute_db_query(self, db: SQLDatabase, question: str) -> Dict[str, Any]:
         try:
             schema = db.get_table_info()
@@ -326,13 +327,13 @@ class AIAgent:
             
             
     # MIGHT BE CREATING TOOL BINDING ISSUES
-    @traceable(run_type="tool", name="Tool_Query_Default_DB")
+    #@traceable(run_type="tool", name="Tool_Query_Default_DB")
     def query_database(self, question: str) -> Dict[str, Any]:
         """Query the default student_grades.db — returns structured result for frontend rendering."""
         return self._execute_db_query(self.default_db, question)
 
 
-    @traceable(run_type="tool", name="Tool_Query_Dynamic_DB")
+    #@traceable(run_type="tool", name="Tool_Query_Dynamic_DB")
     def query_any_database(self, db_filename: str, question: str) -> Dict[str, Any]:
         """Query any .db file in the working directory — returns structured result."""
         full_path = os.path.join(self.working_dir, db_filename)
@@ -352,7 +353,7 @@ class AIAgent:
             }
     
     # NEW    
-    @traceable(run_type="tool", name="Tool_Schema_Introspection")    
+    #@traceable(run_type="tool", name="Tool_Schema_Introspection")    
     def get_database_schema(self, db_filename: str) -> str:
         """Safely retrieve table schemas (CREATE TABLE statements) for a database file."""
         full_path = os.path.join(self.working_dir, db_filename)
@@ -439,13 +440,17 @@ class AIAgent:
                 parent_run = get_current_run_tree()
 
                 # Define a helper to execute the tool with explicit nesting
-                @traceable(run_type="tool", name=tool_name)
-                def execute_tool_with_context():
-                    method = getattr(self, tool_name)
-                    return method(**args)
+                # @traceable(run_type="tool", name=tool_name)
+                # def execute_tool_with_context():
+                #     method = getattr(self, tool_name)
+                #     return method(**args)
 
-                # Execute with context
-                tool_result = execute_tool_with_context()
+                # # Execute with context
+                # tool_result = execute_tool_with_context()
+                
+                method = getattr(self, tool_name)
+                tool_result = method(**args)
+                
 
                 if tool_name in ("query_database", "query_any_database"):
                     # Process structured DB results (ensure result_dict is captured)

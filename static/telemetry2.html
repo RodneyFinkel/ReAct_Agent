@@ -77,7 +77,7 @@
                     this.traceLoading = true;
                     let attempts = 0;
                     
-                    while (attempts < 15) { // Increased to 15 attempts (30 seconds) to give LangSmith more time
+                    while (attempts < 6) { // Increased to 15 attempts (30 seconds) to give LangSmith more time
                         await new Promise(r => setTimeout(r, 2000));
                         
                         try {

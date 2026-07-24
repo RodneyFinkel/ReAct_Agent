@@ -17,12 +17,17 @@ from langchain_core.tools import StructuredTool
 from langsmith import traceable  # ADDED: Explicit tracing decorator for Python methods
 import re
 from utils.prompt_loader import load_prompt
-from utils.llm_utils import get_resilient_llm
+#from utils.llm_utils import get_resilient_llm
 import pandas as pd
 import uuid
 import pyarrow as pa
 import pyarrow.parquet as pq
 from langsmith import get_current_run_tree
+import logging
+
+# Configure logger
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("AIAgent")
 
 
 load_dotenv()
@@ -69,14 +74,22 @@ class GetDatabaseSchemaSchema(BaseModel):
 class AIAgent:
     def __init__(self, api_key: str, working_dir: str = "."):
         
-        self.primary_llm = get_resilient_llm(model_name="llama-3.3-70b-versatile", temperature=0)
-        self.fallback_llm = get_resilient_llm(model_name="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0)
+        self.primary_llm = ChatGroq(
+            model_name="llama-3.3-70b-versatile", 
+            temperature=0
+        )
+        self.fallback_llm = ChatGroq(
+            model_name="meta-llama/llama-4-scout-17b-16e-instruct",  # or a known good fallback
+            temperature=0
+        )
         
+        # Primary LLM with fallback capability
+        self.primary_with_fallback = self.primary_llm.with_fallbacks([self.fallback_llm])
         
         self.working_dir = os.path.abspath(working_dir)
         self.db_path = os.path.join(self.working_dir, "student_grades.db")
 
-        self._ensure_database()
+        #self._ensure_database()
         self.default_db = SQLDatabase.from_uri(f"sqlite:///{self.db_path}")
         
         system_instruction = load_prompt("db_agent")
@@ -84,26 +97,11 @@ class AIAgent:
 
         self._setup_tools2()
         # Bind the tools
-        #self.llm_with_tools = self.llm.bind_tools(self.langchain_tools)
-        self.primary_with_tools = self.primary_llm.bind_tools(self.tools)
+        self.primary_with_tools = self.primary_with_fallback.bind_tools(self.tools)
         self.fallback_with_tools = self.fallback_llm.bind_tools(self.tools)
-        
-        print("All Pre-Tool bindings done...configuring fallback inference layer")
-        
         
         print("Tool bindings done...ReAct agent 5 initialized")
 
-    def _ensure_database(self):
-        if not os.path.exists(self.db_path):
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.executescript("""
-                CREATE TABLE IF NOT EXISTS departments (dept_id INTEGER PRIMARY KEY, dept_name TEXT, building TEXT);
-                CREATE TABLE IF NOT EXISTS students (student_id INTEGER PRIMARY KEY, name TEXT, dept_id INTEGER, email TEXT);
-                CREATE TABLE IF NOT EXISTS grades (grade_id INTEGER PRIMARY KEY, student_id INTEGER, score INTEGER, letter_grade TEXT);
-            """)
-            conn.commit()
-            conn.close()
 
     # USING raw JSON schemas directly
     def _setup_tools(self):
@@ -373,7 +371,7 @@ class AIAgent:
 
     # Main chat method React loop
     @traceable(run_type="chain", name="ReAct_Agent_Master_Loop")
-    def chat(self, user_input: Union[str, List[BaseMessage]]) -> Dict[str, Any]:
+    def chat(self, user_input: Union[str, List[BaseMessage]], callback_handler=None) -> Dict[str, Any]:
         """
         Returns either:
           - {"type": "text", "content": str}          → normal text answer
@@ -388,12 +386,18 @@ class AIAgent:
             # LangGraph mode: Extend with the distilled conversational history
             self.messages.extend(user_input)
         # self.messages.append(HumanMessage(content=user_input))
+        
+        invoke_config = {"run_name": "AIAgent_Inference_Cycle"}
+        if callback_handler:
+            invoke_config["callbacks"] = [callback_handler]
 
         while True:
             # Explicit fallback interceptor
             try:
                 response: AIMessage = self.primary_with_tools.invoke(self.messages,
-                                                                     config={"run_name": "AIAgent_Inference_Cycle"})
+                                                                     #config={"run_name": "AIAgent_Inference_Cycle"},
+                                                                     config=invoke_config
+                                                                     )
         
             except Exception as e:
                 error_str = str(e).lower()
@@ -438,15 +442,7 @@ class AIAgent:
                 
                 # Fetch the current run tree established by app.py's collect_runs()
                 parent_run = get_current_run_tree()
-
-                # Define a helper to execute the tool with explicit nesting
-                # @traceable(run_type="tool", name=tool_name)
-                # def execute_tool_with_context():
-                #     method = getattr(self, tool_name)
-                #     return method(**args)
-
-                # # Execute with context
-                # tool_result = execute_tool_with_context()
+                logger.debug(f"Executing tool: {tool_name} | Run tree: {parent_run}")
                 
                 method = getattr(self, tool_name)
                 tool_result = method(**args)

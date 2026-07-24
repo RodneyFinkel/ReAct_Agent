@@ -11,6 +11,7 @@ from langchain_agent5 import AIAgent
 import uuid
 import logging
 
+
 ## FRONTEND
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
@@ -65,7 +66,7 @@ class AgentExecutionRequest(BaseModel):
     
 # Cached Agent instance helper
 _agent_instance = None    
-    
+# Global instance of the AIAgent to ensure consistent LangSmith trace context across requests - NOT USING   
 def get_standalone_agent(working_dir: str = "."):
     global _agent_instance
     resolved_path = os.path.abspath(working_dir)
@@ -77,21 +78,33 @@ def get_standalone_agent(working_dir: str = "."):
         _agent_instance = AIAgent(api_key=api_key, working_dir=resolved_path)
     return _agent_instance
 
+
 @app.post("/agent")
 async def execute_agent(req: AgentExecutionRequest):
     """Executes the ReAct agent within a run-collection block,
     capturing the exact LangSmith execution ID to route telemetry down the line
     """
     
+    
     try:
-        agent = get_standalone_agent(req.working_dir)
+        #agent = get_standalone_agent(req.working_dir)
+        agent = AIAgent(
+            api_key=os.getenv("GROQ_API_KEY"), 
+            working_dir=req.working_dir
+        )
         
         run_id = None
         result = None
 
         # Primary attempt: Use collect_runs (most reliable for root trace)
         with collect_runs() as run_collector:
-            result = await asyncio.to_thread(agent.chat, req.message)
+            # Pass the run_collector.cb explicitly into the chat method via the thread args
+            result = await asyncio.to_thread(
+                agent.chat, 
+                req.message, 
+                run_collector,
+                
+                )
             
             if run_collector.traced_runs:
                 run_id = str(run_collector.traced_runs[0].trace_id)
@@ -110,25 +123,7 @@ async def execute_agent(req: AgentExecutionRequest):
                 logger.warning(f"get_current_run_tree failed: {e}")
 
         if not run_id:
-            logger.error("Failed to capture any trace ID!")
-        
-        # # Run the agent - let LangSmith handle tracing
-        # result = await asyncio.to_thread(agent.chat, req.message)  # Run sync agent in thread
-        
-        # # Try to get current run from context (more reliable)
-        # try:
-        #     current_run = get_current_run_tree()
-        #     run_id = str(current_run.id) if current_run else None
-        #     print(f"Current run ID from context: {run_id}")
-        # except:
-        #     run_id = None
-
-        # # Fallback to collect_runs if needed
-        # run_id = None
-        # with collect_runs() as run_collector:
-        #     if run_collector.traced_runs:
-        #         run_id = str(run_collector.traced_runs[0].trace_id)
-        #         logger.info(f"Trace recorded with ID: {run_id}")            
+            logger.error("Failed to capture any trace ID!")           
      
         
         # Format polymorphic outputs
@@ -165,53 +160,71 @@ async def get_agent_trace(run_id: str):
     if not ls_client:
         return {"run_id": run_id, "status": "unavailable", "steps": [], 
                 "message": "LangSmith client not configured"}
+        
+    # FIX 1: Explicitly pass the project name. list_runs defaults to "default" without it.
+    project_name = os.getenv("LANGCHAIN_PROJECT", "default")
 
-    for attempt in range(5):  # Up to ~50 seconds
-        try:
-            run = ls_client.read_run(run_id)
-            child_runs = list(ls_client.list_runs(trace_id=run_id))
-            print(f"Attempt {attempt+1}: Found {len(child_runs)} runs")
+    # for attempt in range(20):  # Up to ~50 seconds
+    try:
+        run = ls_client.read_run(run_id)
+        child_runs = list(ls_client.list_runs(
+            trace_id=run_id,
+            project_name=project_name              
+            ))
+        print(f"Found {len(child_runs)} runs")
+        
+        steps = []
+        for child in sorted(child_runs, key=lambda x: x.start_time or 0):
+            if str(getattr(child, 'id', '')) == run_id:
+                continue
+                
+            steps.append({
+                "name": child.name,
+                "type": child.run_type or "unknown",
+                "status": "error" if child.error else "success",
+                "latency_ms": ((child.end_time - child.start_time).total_seconds() * 1000 
+                                if child.end_time and child.start_time else 0),
+                "inputs": child.inputs or {},
+                "outputs": child.outputs or {},
+                "error": child.error
+            })
             
-            steps = []
-            for child in sorted(child_runs, key=lambda x: x.start_time or 0):
-                if str(getattr(child, 'id', '')) == run_id:
-                    continue
-                    
-                steps.append({
-                    "name": child.name,
-                    "type": child.run_type or "unknown",
-                    "status": "error" if child.error else "success",
-                    "latency_ms": ((child.end_time - child.start_time).total_seconds() * 1000 
-                                  if child.end_time and child.start_time else 0),
-                    "inputs": child.inputs or {},
-                    "outputs": child.outputs or {},
-                    "error": child.error
-                })
-
-            print(f"Returning {len(steps)} steps to UI")
+        # FIX 2: Prevent premature "success" states.
+        # If LangSmith hasn't indexed the children yet, force a "pending" status 
+        # so the frontend UI knows to keep polling.
+        if not getattr(run, 'end_time', None) or len(steps) == 0:
             return {
                 "run_id": run_id,
-                "name": getattr(run, 'name', 'Unknown'),
-                "status": "error" if getattr(run, 'error', None) else "success",
-                "latency_ms": ((run.end_time - run.start_time).total_seconds() * 1000 
-                              if run.end_time and run.start_time else 0),
-                "error": getattr(run, 'error', None),
-                "steps": steps
+                "status": "pending",
+                "steps": []
             }
-            
-        except Exception as e:
-            error_str = str(e).lower()
-            if ("404" in error_str or "not found" in error_str) and attempt < 18:
-                await asyncio.sleep(2)
-                continue
-            else:
-                logger.warning(f"Trace fetch attempt {attempt} failed: {e}")
-                if attempt >= 12:
-                    break
 
-    # Fallback
-    return {"run_id": run_id, "status": "pending", "steps": [], 
-            "message": "Trace still being indexed by LangSmith"}
+        print(f"Returning {len(steps)} steps to UI")
+        return {
+            "run_id": run_id,
+            "name": getattr(run, 'name', 'Unknown'),
+            "status": "error" if getattr(run, 'error', None) else "success",
+            "latency_ms": ((run.end_time - run.start_time).total_seconds() * 1000 
+                            if run.end_time and run.start_time else 0),
+            "error": getattr(run, 'error', None),
+            "steps": steps
+        }
+        
+    except Exception as e:
+        error_str = str(e).lower()
+        if ("404" in error_str or "not found" in error_str):
+            return {"run_id": run_id, "status": "pending", "steps": []}
+        #     await asyncio.sleep(2)
+        #     continue
+        # else:
+        #     logger.warning(f"Trace fetch attempt {attempt} failed: {e}")
+        #     if attempt >= 12:
+        #         break
+        logger.warning(f"Trace fetch failed: {e}")
+        return {"run_id": run_id, "status": "error", "steps": []}
+# Fallback
+# return {"run_id": run_id, "status": "pending", "steps": [], 
+#         "message": "Trace still being indexed by LangSmith"}
 
 
 

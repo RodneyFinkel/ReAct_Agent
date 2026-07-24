@@ -37,13 +37,11 @@
 
     <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 overflow-hidden" 
           x-data="{
-              // Left Workspace: Dynamic Agent Execution
               queryInput: '',
               workingDir: '.',
               agentLoading: false,
               agentResult: null,
               
-              // Right Workspace: Programmatic Telemetry
               traceLoading: false,
               selectedStep: null,
               viewMode: 'formatted',
@@ -52,7 +50,7 @@
               async executeAgentQuery() {
                   this.agentLoading = true;
                   this.agentResult = null;
-                  this.traceData = null; // Clear previous traces
+                  this.traceData = null;
                   this.selectedStep = null;
                   try {
                       const res = await fetch('/agent', {
@@ -73,43 +71,46 @@
                   this.agentLoading = false;
               },
 
-                async fetchLangSmithTelemetry(runId) {
-                    this.traceLoading = true;
-                    let attempts = 0;
-                    
-                    while (attempts < 6) { // Increased to 15 attempts (30 seconds) to give LangSmith more time
-                        await new Promise(r => setTimeout(r, 2000));
-                        
-                        try {
-                            const res = await fetch(`/agent/trace/${runId}`);
-                            if (res.ok) {
-                                // 1. Immediately bind the response to Alpine's reactive scope
-                                this.traceData = await res.json();
-                                
-                                // 2. Evaluate against the reactive variable
-                                if (this.traceData.status !== 'pending' && this.traceData.steps && this.traceData.steps.length > 0) {
-                                    this.selectedStep = this.traceData.steps[0];
-                                    break; 
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('Trace polling cycle error...', e);
-                        }
-                        attempts++;
-                    }
-                    
-                    // 3. Handle the final timeout state gracefully
-                    if (!this.traceData || !this.traceData.steps || this.traceData.steps.length === 0) {
-                        console.warn('LangSmith indexed the parent run, but child steps timed out or are empty.');
-                        this.selectedStep = null;
-                    }
-                    
-                    this.traceLoading = false;
-                }
-                
-                
+              async fetchLangSmithTelemetry(runId) {
+                  this.traceLoading = true;
+                  let attempts = 0;
+                  
+                  while (attempts < 3) {
+                      await new Promise(r => setTimeout(r, 2500));
+                      
+                      try {
+                          const res = await fetch(`/agent/trace/${runId}`);
+                          if (res.ok) {
+                              this.traceData = await res.json();
+                              
+                              if (this.traceData.status !== 'pending' && this.traceData.steps && this.traceData.steps.length > 0) {
+                                  this.selectedStep = this.traceData.steps[0];
+                                  break; 
+                              }
+                          }
+                      } catch (e) {
+                          console.warn('Trace polling cycle error...', e);
+                      }
+                      attempts++;
+                  }
+                  
+                  if (!this.traceData || !this.traceData.steps || this.traceData.steps.length === 0) {
+                      console.warn('LangSmith indexed the parent run, but child steps timed out or are empty.');
+                  }
+                  
+                  this.traceLoading = false;
+              },
 
-              
+              // NEW: Manual Refresh
+              async manualRefreshTrace() {
+                  if (!this.agentResult?.run_id) {
+                      alert('No active trace ID found. Please run a query first.');
+                      return;
+                  }
+                  this.traceLoading = true;
+                  await this.fetchLangSmithTelemetry(this.agentResult.run_id);
+                  this.traceLoading = false;
+              }
           }">
 
         <section class="xl:col-span-5 bg-[#0f1422] border-r border-gray-800 p-6 flex flex-col h-full overflow-hidden">
@@ -231,9 +232,21 @@
                     <h2 class="text-xs font-mono text-indigo-400 tracking-wider uppercase font-bold">🔍 Deep Trace Explorer (LangSmith SDK)</h2>
                     <p class="text-xs text-gray-400 mt-0.5">Programmatically loaded sequential node runs</p>
                 </div>
-                <div class="text-right font-mono text-[10px]" x-show="traceData">
-                    <span class="text-gray-500 block">SESSION ID</span>
-                    <span class="text-indigo-400 text-xs font-bold" x-text="traceData?.run_id ? traceData.run_id.substring(0,18) + '...' : ''"></span>
+                
+                <div class="flex items-center gap-3">
+                    <div class="text-right font-mono text-[10px]" x-show="traceData">
+                        <span class="text-gray-500 block">SESSION ID</span>
+                        <span class="text-indigo-400 text-xs font-bold" x-text="traceData?.run_id ? traceData.run_id.substring(0,18) + '...' : ''"></span>
+                    </div>
+                    
+                    <!-- NEW: Manual Refresh Button -->
+                    <button 
+                        @click="manualRefreshTrace()"
+                        :disabled="traceLoading"
+                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white text-xs font-mono rounded-xl flex items-center gap-2 transition-all">
+                        <span x-show="!traceLoading">↻ Refresh Trace</span>
+                        <span x-show="traceLoading" class="animate-spin">⟳</span>
+                    </button>
                 </div>
             </div>
 

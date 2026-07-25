@@ -2,3 +2,9 @@
 .env
 env
 /env
+env_slim
+/env_slim
+.env_slim
+requirements2.txt
+.requirements2.txt
+/requirements2.txt

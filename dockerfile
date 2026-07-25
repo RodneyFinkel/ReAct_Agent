@@ -14,27 +14,23 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app.py .
 COPY langchain_agent5.py .
-COPY prompts.yaml .
-COPY llm_utils.py .
-COPY prompt_loader.py .
+# Copy config
+COPY config/prompts.yaml config/prompts.yaml
 
-# Create expected directories
-RUN mkdir -p static config utils
+# Copy utils
+COPY utils/prompt_loader.py utils/prompt_loader.py
+COPY utils/llm_utils.py utils/llm_utils.py
+RUN touch utils/__init__.py
 
 # Copy frontend
-COPY telemetry.html static/telemetry.html
-
-# Copy prompts into the location expected by prompt_loader
-COPY prompts.yaml config/prompts.yaml
+COPY static/telemetry.html static/telemetry.html
 
 # Copy database files
 COPY student_grades.db .
 COPY stocks.db .
 COPY ecommerce.db .
 
-# Create a simple utils package so the import works
-RUN touch utils/__init__.py
-COPY prompt_loader.py utils/prompt_loader.py
+
 
 # Environment
 ENV PYTHONUNBUFFERED=1

@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv
+env/
+.git
+.gitignore
+*.parquet
+query_*.parquet
+.DS_Store
+*.md
+.idea
+.vscode

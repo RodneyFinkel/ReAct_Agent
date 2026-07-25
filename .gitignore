@@ -8,3 +8,6 @@ env_slim
 requirements2.txt
 .requirements2.txt
 /requirements2.txt
+nl2sql-agent.tar
+.nl2sql-agent.tar
+/nl2sql-agent.tar

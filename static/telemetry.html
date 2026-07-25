@@ -6,6 +6,7 @@
     <title>NL2SQL Agent Console & Tracing Center</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Plotly.js for visualizations -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -71,14 +72,16 @@
                   }
                   this.agentLoading = false;
 
-                  // If the result is a visualization, render it using Plotly
+                  // Render Plotly chart if visualization result
                   if (this.agentResult?.type === 'visualization' && this.agentResult.result?.chart_json) {
-                        setTimeout(() => {
-                            const container = document.getElementById('plotly-container');
-                            if (container) {
-                                const fig = JSON.parse(this.agentResult.result.chart_json);
-                                Plotly.newPlot(container, fig.data, fig.layout, {responsive: true});
-                                }}, 100);
+                      setTimeout(() => {
+                          const container = document.getElementById('plotly-container');
+                          if (container) {
+                              const fig = JSON.parse(this.agentResult.result.chart_json);
+                              Plotly.newPlot(container, fig.data, fig.layout, {responsive: true});
+                          }
+                      }, 100);
+                  }
               },
 
               async fetchLangSmithTelemetry(runId) {
@@ -145,111 +148,109 @@
                 </button>
             </div>
 
-            
-
-
             <div class="flex-1 flex flex-col mt-4 overflow-hidden">
-    <label class="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 shrink-0">
-        Standard Output Logger
-    </label>
-    
-    <div class="flex-1 bg-[#0b0f19] border border-gray-800 rounded-xl p-4 overflow-y-auto font-mono text-xs flex flex-col">
-        <div class="text-[10px] text-gray-500 mb-3">// Response payload</div>
+                <label class="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 shrink-0">
+                    Standard Output Logger
+                </label>
+                
+                <div class="flex-1 bg-[#0b0f19] border border-gray-800 rounded-xl p-4 overflow-y-auto font-mono text-xs flex flex-col">
+                    <div class="text-[10px] text-gray-500 mb-3">// Response payload</div>
 
-        <!-- Loading -->
-        <div x-show="agentLoading" class="space-y-2 animate-pulse flex-1">
-            <div class="h-2 bg-gray-800 rounded w-3/4"></div>
-            <div class="h-2 bg-gray-800 rounded w-1/2"></div>
-        </div>
+                    <!-- Loading -->
+                    <div x-show="agentLoading" class="space-y-2 animate-pulse flex-1">
+                        <div class="h-2 bg-gray-800 rounded w-3/4"></div>
+                        <div class="h-2 bg-gray-800 rounded w-1/2"></div>
+                    </div>
 
-        <!-- No result yet -->
-        <div x-show="!agentResult && !agentLoading" class="text-gray-600 italic flex-1 flex items-center justify-center">
-            Awaiting query launch...
-        </div>
+                    <!-- No result yet -->
+                    <div x-show="!agentResult && !agentLoading" class="text-gray-600 italic flex-1 flex items-center justify-center">
+                        Awaiting query launch...
+                    </div>
 
-        <!-- Text / Error Response -->
-        <div x-show="agentResult?.type === 'text' && !agentLoading" class="flex-1">
-            <div class="p-4 bg-gray-950/80 rounded-lg border border-gray-700 text-gray-300 whitespace-pre-wrap"
-                 x-text="agentResult.content || 'No content'">
-            </div>
-        </div>
+                    <!-- Text / Error Response -->
+                    <div x-show="agentResult?.type === 'text' && !agentLoading" class="flex-1">
+                        <div class="p-4 bg-gray-950/80 rounded-lg border border-gray-700 text-gray-300 whitespace-pre-wrap"
+                             x-text="agentResult.content || 'No content'">
+                        </div>
+                    </div>
 
-        <!-- DB Query Result -->
-        <div x-show="agentResult?.type === 'db_result' && !agentLoading" class="flex-1 flex flex-col space-y-4 overflow-hidden">
+                    <!-- DB Query Result -->
+                    <div x-show="agentResult?.type === 'db_result' && !agentLoading" class="flex-1 flex flex-col space-y-4 overflow-hidden">
 
-            <!-- Status -->
-            <div class="flex items-center gap-2">
-                <span class="px-3 py-1 text-xs font-bold rounded-full bg-emerald-900 text-emerald-400"
-                      x-text="agentResult.error ? 'ERROR' : 'QUERY SUCCESS'">
-                </span>
-                <span class="text-emerald-400 text-xs" x-text="agentResult.row_count + ' rows returned'"></span>
-            </div>
+                        <!-- Status -->
+                        <div class="flex items-center gap-2">
+                            <span class="px-3 py-1 text-xs font-bold rounded-full bg-emerald-900 text-emerald-400"
+                                  x-text="agentResult.error ? 'ERROR' : 'QUERY SUCCESS'">
+                            </span>
+                            <span class="text-emerald-400 text-xs" x-text="agentResult.row_count + ' rows returned'"></span>
+                        </div>
 
-            <!-- SQL Query -->
-            <div>
-                <span class="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">Generated SQL</span>
-                <pre class="bg-[#111827] border border-gray-700 p-3 rounded-xl text-blue-300 text-[11px] overflow-x-auto"
-                     x-text="agentResult.sql"></pre>
-            </div>
+                        <!-- SQL Query -->
+                        <div>
+                            <span class="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">Generated SQL</span>
+                            <pre class="bg-[#111827] border border-gray-700 p-3 rounded-xl text-blue-300 text-[11px] overflow-x-auto"
+                                 x-text="agentResult.sql"></pre>
+                        </div>
 
-            <!-- Results Table -->
-            <div x-show="agentResult.columns && agentResult.columns.length > 0">
-                <span class="text-[10px] text-gray-400 uppercase tracking-wider block mb-2">Query Results (Preview)</span>
-                <div class="overflow-x-auto border border-gray-700 rounded-xl bg-[#111827]">
-                    <table class="min-w-full text-xs">
-                        <thead>
-                            <tr class="border-b border-gray-700">
-                                <template x-for="col in agentResult.columns" :key="col">
-                                    <th class="px-3 py-2 text-left font-mono text-gray-400" x-text="col"></th>
-                                </template>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-800">
-                            <template x-for="(row, i) in agentResult.rows_preview" :key="i">
-                                <tr class="hover:bg-gray-800/50">
-                                    <template x-for="(cell, j) in row" :key="j">
-                                        <td class="px-3 py-2 text-gray-300 font-mono" 
-                                            x-text="cell !== null ? cell : 'NULL'"></td>
-                                    </template>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                        <!-- Results Table -->
+                        <div x-show="agentResult.columns && agentResult.columns.length > 0">
+                            <span class="text-[10px] text-gray-400 uppercase tracking-wider block mb-2">Query Results (Preview)</span>
+                            <div class="overflow-x-auto border border-gray-700 rounded-xl bg-[#111827]">
+                                <table class="min-w-full text-xs">
+                                    <thead>
+                                        <tr class="border-b border-gray-700">
+                                            <template x-for="col in agentResult.columns" :key="col">
+                                                <th class="px-3 py-2 text-left font-mono text-gray-400" x-text="col"></th>
+                                            </template>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-800">
+                                        <template x-for="(row, i) in agentResult.rows_preview" :key="i">
+                                            <tr class="hover:bg-gray-800/50">
+                                                <template x-for="(cell, j) in row" :key="j">
+                                                    <td class="px-3 py-2 text-gray-300 font-mono" 
+                                                        x-text="cell !== null ? cell : 'NULL'"></td>
+                                                </template>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Parquet File -->
+                        <div x-show="agentResult.file_path" class="bg-gray-950 border border-gray-700 rounded-xl p-3">
+                            <span class="text-[10px] text-gray-400 block">Full results saved to:</span>
+                            <span class="text-emerald-400 font-mono text-xs break-all" 
+                                  x-text="agentResult.file_path"></span>
+                        </div>
+
+                        <!-- Error -->
+                        <div x-show="agentResult.error" 
+                             class="p-4 bg-rose-950/30 border border-rose-900 rounded-xl text-rose-300 text-xs">
+                            <span class="font-bold">Error:</span> 
+                            <span x-text="agentResult.error"></span>
+                        </div>
+                    </div>
+
+                    <!-- Visualization Result -->
+                    <div x-show="agentResult?.type === 'visualization' && !agentLoading" class="flex-1 flex flex-col space-y-4 overflow-hidden">
+                        <div class="flex items-center gap-2">
+                            <span class="px-3 py-1 text-xs font-bold rounded-full bg-violet-900 text-violet-400">VISUALIZATION</span>
+                            <span class="text-violet-400 text-xs" x-text="agentResult.result?.chart_type"></span>
+                        </div>
+
+                        <div class="bg-[#111827] border border-gray-700 rounded-xl p-4 flex-1 min-h-[400px]" id="plotly-container">
+                            <!-- Plotly chart renders here -->
+                        </div>
+
+                        <div x-show="agentResult.result?.data_preview" class="text-xs text-gray-400">
+                            <span class="uppercase tracking-wider">Data Shape: </span>
+                            <span x-text="agentResult.result.data_shape"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <!-- Parquet File -->
-            <div x-show="agentResult.file_path" class="bg-gray-950 border border-gray-700 rounded-xl p-3">
-                <span class="text-[10px] text-gray-400 block">Full results saved to:</span>
-                <span class="text-emerald-400 font-mono text-xs break-all" 
-                      x-text="agentResult.file_path"></span>
-            </div>
-
-            <!-- Error -->
-            <div x-show="agentResult.error" 
-                 class="p-4 bg-rose-950/30 border border-rose-900 rounded-xl text-rose-300 text-xs">
-                <span class="font-bold">Error:</span> 
-                <span x-text="agentResult.error"></span>
-            </div>
-        </div>
-        <!-- Visualization Result -->
-            <div x-show="agentResult?.type === 'visualization' && !agentLoading" class="flex-1 flex flex-col space-y-4 overflow-hidden">
-                <div class="flex items-center gap-2">
-                    <span class="px-3 py-1 text-xs font-bold rounded-full bg-violet-900 text-violet-400">VISUALIZATION</span>
-                    <span class="text-violet-400 text-xs" x-text="agentResult.result?.chart_type"></span>
-                </div>
-
-                <div class="bg-[#111827] border border-gray-700 rounded-xl p-4 flex-1 min-h-[400px]" id="plotly-container">
-                    <!-- Plotly chart renders here -->
-                </div>
-
-                <div x-show="agentResult.result?.data_preview" class="text-xs text-gray-400">
-                    <span class="uppercase tracking-wider">Data Shape: </span>
-                    <span x-text="agentResult.result.data_shape"></span>
-                </div>
-            </div>  
-    </div>
-</div>
         </section>
 
         <section class="xl:col-span-7 bg-[#0b0f19] p-6 flex flex-col h-full overflow-hidden">

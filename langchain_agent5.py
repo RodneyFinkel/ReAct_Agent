@@ -14,7 +14,7 @@ from langchain_community.utilities import SQLDatabase
 from sqlglot import parse_one, exp
 from sqlglot.errors import ParseError
 from langchain_core.tools import StructuredTool
-from langsmith import traceable  # ADDED: Explicit tracing decorator for Python methods
+from langsmith import traceable, get_current_run_tree  # ADDED: Explicit tracing decorator for Python methods
 import re
 from utils.prompt_loader import load_prompt
 #from utils.llm_utils import get_resilient_llm
@@ -22,8 +22,9 @@ import pandas as pd
 import uuid
 import pyarrow as pa
 import pyarrow.parquet as pq
-from langsmith import get_current_run_tree
 import logging
+import plotly.express as px
+
 
 # Configure logger
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -56,7 +57,6 @@ class ListAvailableDatabasesSchema(BaseModel):
         description="Just pass 'trigger' to execute."
     )
 
-# Structured DB Result Format 
 class DbQueryResult(BaseModel):
     sql: str
     columns: List[str]
@@ -65,10 +65,18 @@ class DbQueryResult(BaseModel):
     file_path: Optional[str] = None
     error: Optional[str] = None
     
-# NEW SCHEMA INTROSPECTION TOOL
 class GetDatabaseSchemaSchema(BaseModel):
     db_filename: str = Field(description="Exact filename of the .db file in the working directory (e.g., student_grades.db)")
-    
+
+# NEW    
+class VisualizeQuerySchema(BaseModel):
+    question: str = Field(description="The original natural language question that generated the data")
+    #data_file: str = Field(description="Path to the parquet file (.parquet) from the current database query. DbQueryResult file_path .")
+    chart_type: str = Field(description="Chart type: bar, line, pie, scatter, histogram, or 'auto' for intelligent selection.", 
+                       default="auto"
+                       )
+                       
+                       
 
 
 class AIAgent:
@@ -88,8 +96,6 @@ class AIAgent:
         
         self.working_dir = os.path.abspath(working_dir)
         self.db_path = os.path.join(self.working_dir, "student_grades.db")
-
-        #self._ensure_database()
         self.default_db = SQLDatabase.from_uri(f"sqlite:///{self.db_path}")
         
         system_instruction = load_prompt("db_agent")
@@ -165,7 +171,16 @@ class AIAgent:
                 name="get_database_schema",
                 description="Retrieve schema information, tables, and column DDL structures for a specific database.",
                 args_schema=GetDatabaseSchemaSchema,
-            )
+            ),
+            StructuredTool.from_function(
+                func=self.visualize_query,
+                name="visualize_query",
+                description=("Generate an interactive Plotly visualization from the most recent database query result."
+                    "Call this after a successful query_database or query_any_database call."
+                    "No need to pass a file path — the tool automatically uses the latest parquet file."
+                    ),
+                args_schema=VisualizeQuerySchema,
+            )      
         ]
 
         
@@ -297,7 +312,7 @@ class AIAgent:
             display_rows = full_rows[:20]  # Slice to max 50 rows for Streamlit/UI
             print(f"Query returned {len(results)} rows. Displaying first {display_rows} rows.")
             
-            # Save FULL dataset to Parquet using pure PyArrow
+            # Save FULL dataset to Parquet using PyArrow
             file_name = f"query_{uuid.uuid4().hex[:8]}.parquet"
             file_path = os.path.join(self.working_dir, file_name)
             print(f"Saving Db query to parquet file:{file_path}")
@@ -324,7 +339,7 @@ class AIAgent:
             }
             
             
-    # MIGHT BE CREATING TOOL BINDING ISSUES
+    
     #@traceable(run_type="tool", name="Tool_Query_Default_DB")
     def query_database(self, question: str) -> Dict[str, Any]:
         """Query the default student_grades.db — returns structured result for frontend rendering."""
@@ -366,6 +381,72 @@ class AIAgent:
             return schema_info
         except Exception as e:
             return f"Error reading schema metadata for '{db_filename}': {str(e)}"
+        
+     
+       
+    def visualize_query(self, question: str, chart_type: str = "auto") -> Dict[str, Any]:
+        """Generate interactive Plotly visualization from parquet query results."""
+        
+        # Look for the newest .parquet file in the working directory
+        try:
+            parquet_files = sorted(
+                [f for f in os.listdir(self.working_dir) 
+                 if f.startswith("query_") and f.endswith(".parquet")],
+                key=lambda x: os.path.getmtime(os.path.join(self.working_dir, x)),
+                reverse=True
+            )
+        except Exception as e:
+            return {"error": f"Failed to list parquet files: {str(e)}"}
+    
+        if not parquet_files:
+            return {"error": "No previous query result found. Run a database query first."}
+        
+        data_file = parquet_files[0]
+        full_path = os.path.join(self.working_dir, data_file)
+        if not os.path.exists(full_path) or not data_file.endswith(".parquet"):
+            return {"error": f"Data file '{data_file}' not found or is not a parquet file."}
+        
+        try:
+            df = pd.read_parquet(full_path)
+            if df.empty:
+                return {"error": "No data available for visualization."}
+            
+            # Intelligent chart type selection
+            if chart_type == "auto":
+                numeric_cols = df.select_dtypes(include=['number']).columns
+                if len(numeric_cols) > 0 and len(df.columns) >= 2:
+                    chart_type = "bar"
+                else:
+                    chart_type = "table"
+
+            # Generate figure
+            if chart_type == "bar":
+                fig = px.bar(df, x=df.columns[0], y=df.columns[1] if len(df.columns) > 1 else numeric_cols[0],
+                             title=question[:100], labels={"x": df.columns[0], "y": "Value"})
+            elif chart_type == "line":
+                fig = px.line(df, x=df.columns[0], y=df.columns[1] if len(df.columns) > 1 else numeric_cols[0],
+                              title=question[:100])
+            elif chart_type == "pie" and len(df.columns) >= 2:
+                fig = px.pie(df, names=df.columns[0], values=df.columns[1], title=question[:100])
+            elif chart_type == "histogram":
+                fig = px.histogram(df, x=df.columns[0], title=question[:100])
+            else:
+                fig = px.table(df.head(15), title=question[:100])
+
+            return {
+                "type": "visualization",
+                "chart_json": fig.to_json(),
+                "chart_type": chart_type,
+                "data_shape": f"{df.shape[0]} rows x {df.shape[1]} columns",
+                "data_preview": df.head(8).to_dict(orient="records"),
+                "source_file": data_file
+            }
+
+        except Exception as e:
+            return {"error": f"Visualization failed: {str(e)}"}
+                
+            
+        
 
  
 
@@ -451,11 +532,14 @@ class AIAgent:
                 if tool_name in ("query_database", "query_any_database"):
                     # Process structured DB results (ensure result_dict is captured)
                     result_dict = tool_result 
-                    
+                    # Make the path extremely clear for the LLM
+                    file_path = result_dict.get('file_path')
                     short_note = (
                         f"Query executed successfully.\n"
                         f"Total Rows: {result_dict.get('row_count', 0)}\n"
-                        f"File saved to: {result_dict.get('file_path', 'N/A')}"
+                        f"File saved to: {result_dict.get('file_path', 'N/A')}\n"
+                        f"IMPORTANT: Full results saved to this exact file path → {file_path}\n"
+                        f"When calling visualize_query, you MUST use this exact path as the data_file argument."
                     )
 
                     self.messages.append(ToolMessage(
@@ -467,6 +551,15 @@ class AIAgent:
                         "type": "db_result",
                         "result": DbQueryResult(**result_dict) 
                     }
+                elif tool_name == "visualize_query":
+                    # Process visualization results
+                    viz_result = tool_result                 
+                    self.messages.append(ToolMessage(
+                        tool_call_id=tool_id,
+                        content=f"Visualization generated successfully. Chart type: {viz_result.get('chart_type', 'N/A')}"
+                    ))
+                    return {"type": "visualization", "result": viz_result}
+                
                 else:
                     self.messages.append(ToolMessage(
                         tool_call_id=tool_id,

@@ -70,6 +70,14 @@ db_agent: |
     - Use when no database is specified
     - Use when database discovery is required
 
+    5. visualize_query
+    - Use after a successful database query (when parquet file is available)
+    - Great for aggregations, trends, comparisons
+    - Generates interactive charts (bar, line, pie, etc.)
+    - You MUST pass the EXACT file path that was returned in the previous tool observation
+    - Never invent or guess the parquet filename
+    
+
     ==================================================
     MANDATORY DATABASE RULES
     ==================================================

@@ -57,7 +57,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 async def get_root_interface():
     """Serves the unified, programmatic tracing console directly."""
-    return FileResponse("static/telemetry2.html")
+    return FileResponse("static/telemetry.html")
 
 # Request Schema for the standalone execution target
 class AgentExecutionRequest(BaseModel):
@@ -139,6 +139,15 @@ async def execute_agent(req: AgentExecutionRequest):
                 "rows_preview": getattr(res, "rows", [])[:10] if hasattr(res, "rows") else [],
                 "file_path": getattr(res, "file_path", None)
             }
+            
+        elif isinstance(result, dict) and result.get("type") == "visualization":
+            # Pass visualization results through cleanly
+            return {
+                "type": "visualization",
+                "run_id": run_id,
+                "result": result.get("result")
+            }
+            
         else:
             # Catch plain string fallbacks or text responses
             content = result.get("content", str(result)) if isinstance(result, dict) else str(result)

@@ -478,7 +478,7 @@ class AIAgent:
                 response: AIMessage = self.primary_with_tools.invoke(self.messages,
                                                                      #config={"run_name": "AIAgent_Inference_Cycle"},
                                                                      config=invoke_config
-                                                                     )
+                                 )
         
             except Exception as e:
                 error_str = str(e).lower()

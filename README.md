@@ -25,3 +25,20 @@ git clone https://github.com/YOUR_GITHUB_USERNAME/ReAct_Agent.git
 cd ReAct_Agent
 cp .env.example .env   # then fill in your keys
 docker compose up --build -d
+
+FOR BOTH OPTIONS create a .env file with the following variables
+
+# ===========================================
+# NL2SQL Agent - Environment Variables
+# ===========================================
+# Copy this file to .env and fill in your real keys
+
+
+# Required - Get from https://console.groq.com
+GROQ_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Optional but recommended - Get from https://smith.langchain.com
+LANGCHAIN_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
+LANGCHAIN_PROJECT=nl2sql-agent
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_ENDPOINT=https://api.smith.langchain.

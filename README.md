@@ -102,3 +102,5 @@ LANGCHAIN_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
 LANGCHAIN_PROJECT=nl2sql-agent
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_ENDPOINT=https://api.smith.langchain.
+
+![NL2SQL System Architecture](system_architecture.svg)

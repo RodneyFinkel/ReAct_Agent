@@ -2,7 +2,6 @@ import os
 import sqlite3
 import argparse
 from typing import Dict, Any, List, Optional, Union
-from certifi.__main__ import args
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -446,8 +445,6 @@ class AIAgent:
             return {"error": f"Visualization failed: {str(e)}"}
                 
             
-        
-
  
 
     # Main chat method React loop

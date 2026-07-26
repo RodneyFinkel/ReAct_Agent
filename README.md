@@ -58,6 +58,7 @@ flowchart TD
     TraceTree -.->|Renders JSON Steps| TraceView
     Parquet -.->|Chart JSON via API| Plotly
     AIAgent -.->|Returns Content| Console
+"""
 
 <img width="1079" height="1804" alt="Screenshot 2026-07-21 at 16 33 23" src="https://github.com/user-attachments/assets/5129f970-acd0-4927-9443-5fce10f28fd9" />
 

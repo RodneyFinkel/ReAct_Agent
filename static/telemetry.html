@@ -38,117 +38,137 @@
     </header>
 
     <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 overflow-hidden" 
-          x-data="{
-              queryInput: '',
-              workingDir: '.',
-              agentLoading: false,
-              agentResult: null,
-              
-              traceLoading: false,
-              selectedStep: null,
-              viewMode: 'formatted',
-              traceData: null,
-              
-              async executeAgentQuery() {
-                  this.agentLoading = true;
-                  this.agentResult = null;
-                  this.traceData = null;
-                  this.selectedStep = null;
-                  try {
-                      const res = await fetch('/agent', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ message: this.queryInput, working_dir: this.workingDir })
-                      });
-                      
-                      if (!res.ok) throw new Error('Internal validation abort');
-                      this.agentResult = await res.json();
+      x-data="{
+          queryInput: '',
+          workingDir: '.',
+          agentLoading: false,
+          agentResult: null,
 
-                      // inside executeAgentQuery, after this.agentResult = await res.json();
-                      if (this.agentResult?.run_id) {
-                          await this.loadRunMetadata(this.agentResult.run_id);
-                      }
-                    await this.loadRecentRuns();
-                      
-                      if (this.agentResult && this.agentResult.run_id) {
-                          await this.fetchLangSmithTelemetry(this.agentResult.run_id);
-                      }
-                  } catch (e) {
-                      this.agentResult = { type: 'text', content: 'Fallback: Error contacting backend API.' };
+          // Metadata & recent runs
+          runMetadata: null,
+          recentRuns: [],
+
+          // Old waterfall (can be removed later)
+          traceLoading: false,
+          selectedStep: null,
+          viewMode: 'formatted',
+          traceData: null,
+
+          async executeAgentQuery() {
+              this.agentLoading = true;
+              this.agentResult = null;
+              this.runMetadata = null;
+              this.traceData = null;
+              this.selectedStep = null;
+
+              try {
+                  const res = await fetch('/agent', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          message: this.queryInput,
+                          working_dir: this.workingDir
+                      })
+                  });
+
+                  if (!res.ok) throw new Error('Internal validation abort');
+                  this.agentResult = await res.json();
+
+                  // Load metadata + recent runs
+                  if (this.agentResult?.run_id) {
+                      await this.loadRunMetadata(this.agentResult.run_id);
                   }
-                  this.agentLoading = false;
+                  await this.loadRecentRuns();
 
-                  // Render Plotly chart if visualization result
-                  if (this.agentResult?.type === 'visualization' && this.agentResult.result?.chart_json) {
-                      setTimeout(() => {
-                          const container = document.getElementById('plotly-container');
-                          if (container) {
+                  // Optional: keep old waterfall for now
+                  if (this.agentResult?.run_id) {
+                      await this.fetchLangSmithTelemetry(this.agentResult.run_id);
+                  }
+
+              } catch (e) {
+                  this.agentResult = {
+                      type: 'text',
+                      content: 'Fallback: Error contacting backend API.'
+                  };
+              }
+
+              this.agentLoading = false;
+
+              // Render Plotly chart
+              if (this.agentResult?.type === 'visualization' && this.agentResult.result?.chart_json) {
+                  setTimeout(() => {
+                      const container = document.getElementById('plotly-container');
+                      if (container) {
+                          try {
                               const fig = JSON.parse(this.agentResult.result.chart_json);
                               Plotly.newPlot(container, fig.data, fig.layout, {responsive: true});
+                          } catch (err) {
+                              console.error('Plotly error:', err);
                           }
-                      }, 100);
-                  }
-              },
-
-            
-            
-
-            // NEW: recent runs fetch
-            recentRuns: [],
-            async loadRecentRuns() {
-                try {
-                    const res = await fetch('/agent/runs/recent?limit=10');
-                    if (res.ok) {
-                        const data = await res.json();
-                        this.recentRuns = data.runs || [];
-                    }
-                } catch (e) {
-                    console.warn('Recent runs fetch failed', e);
-                }
-            },
-
-            // Old: fetchLangSmithTelemetry
-              async fetchLangSmithTelemetry(runId) {
-                  this.traceLoading = true;
-                  let attempts = 0;
-                  
-                  while (attempts < 3) {
-                      await new Promise(r => setTimeout(r, 2500));
-                      
-                      try {
-                          const res = await fetch(`/agent/trace/${runId}`);
-                          if (res.ok) {
-                              this.traceData = await res.json();
-                              
-                              if (this.traceData.status !== 'pending' && this.traceData.steps && this.traceData.steps.length > 0) {
-                                  this.selectedStep = this.traceData.steps[0];
-                                  break; 
-                              }
-                          }
-                      } catch (e) {
-                          console.warn('Trace polling cycle error...', e);
                       }
-                      attempts++;
-                  }
-                  
-                  if (!this.traceData || !this.traceData.steps || this.traceData.steps.length === 0) {
-                      console.warn('LangSmith indexed the parent run, but child steps timed out or are empty.');
-                  }
-                  
-                  this.traceLoading = false;
-              },
-
-              // NEW: Manual Refresh
-              async manualRefreshTrace() {
-                  if (!this.agentResult?.run_id) {
-                      alert('No active trace ID found. Please run a query first.');
-                      return;
-                  }
-                  this.traceLoading = true;
-                  await this.fetchLangSmithTelemetry(this.agentResult.run_id);
-                  this.traceLoading = false;
+                  }, 100);
               }
-          }">
+          },
+
+          async loadRunMetadata(runId) {
+              if (!runId) return;
+              try {
+                  const res = await fetch(`/agent/run/${runId}/metadata`);
+                  if (res.ok) {
+                      this.runMetadata = await res.json();
+                  }
+              } catch (e) {
+                  console.warn('Metadata fetch failed', e);
+              }
+          },
+
+          async loadRecentRuns() {
+              try {
+                  const res = await fetch('/agent/runs/recent?limit=10');
+                  if (res.ok) {
+                      const data = await res.json();
+                      this.recentRuns = data.runs || [];
+                  }
+              } catch (e) {
+                  console.warn('Recent runs fetch failed', e);
+              }
+          },
+
+          // Optional old waterfall methods (can delete later)
+          async fetchLangSmithTelemetry(runId) {
+              this.traceLoading = true;
+              let attempts = 0;
+
+              while (attempts < 3) {
+                  await new Promise(r => setTimeout(r, 2500));
+                  try {
+                      const res = await fetch(`/agent/trace/${runId}`);
+                      if (res.ok) {
+                          this.traceData = await res.json();
+                          if (this.traceData.status !== 'pending' && this.traceData.steps?.length > 0) {
+                              this.selectedStep = this.traceData.steps[0];
+                              break;
+                          }
+                      }
+                  } catch (e) {
+                      console.warn('Trace polling error', e);
+                  }
+                  attempts++;
+              }
+              this.traceLoading = false;
+          },
+
+          async manualRefreshTrace() {
+              if (!this.agentResult?.run_id) {
+                  alert('No active trace ID found.');
+                  return;
+              }
+              this.traceLoading = true;
+              await this.fetchLangSmithTelemetry(this.agentResult.run_id);
+              this.traceLoading = false;
+          }
+      }"
+      x-init="loadRecentRuns()">
 
         <section class="xl:col-span-5 bg-[#0f1422] border-r border-gray-800 p-6 flex flex-col h-full overflow-hidden">
             <div class="mb-4 shrink-0">

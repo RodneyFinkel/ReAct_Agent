@@ -58,7 +58,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 async def get_root_interface():
     """Serves the unified, programmatic tracing console directly."""
-    return FileResponse("static/telemetry2.html")
+    return FileResponse("static/telemetry.html")
 
 # Request Schema for the standalone execution target
 class AgentExecutionRequest(BaseModel):

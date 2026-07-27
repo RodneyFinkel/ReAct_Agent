@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage
 from langchain_agent5 import AIAgent
 import uuid
 import logging
+from datetime import datetime, timezone
 
 
 ## FRONTEND
@@ -57,7 +58,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 async def get_root_interface():
     """Serves the unified, programmatic tracing console directly."""
-    return FileResponse("static/telemetry.html")
+    return FileResponse("static/telemetry2.html")
 
 # Request Schema for the standalone execution target
 class AgentExecutionRequest(BaseModel):
@@ -159,6 +160,42 @@ async def execute_agent(req: AgentExecutionRequest):
     except Exception as e:
         logger.error(f"Execution Error within agent loop: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+@app.get("/agent/runs/recent")
+async def get_recent_runs(limit: int = 10):
+    """Fetcthes the most recent runs from LangSmith."""
+    if not ls_client:
+        return {"runs": [], "message": "LangSmith client not configured"}
+    
+    project_name = os.getenv("LANGCHAIN_PROJECT", "default")
+    try:
+        runs = list(ls_client.list_runs(
+            project_name=project_name,
+            limit=limit,
+            order = "desc"
+        ))
+        
+        result = []
+        for run in runs:
+            latency_ms = None
+            if run.end_time and run.start_time:
+                latency_ms = (run.end_time - run.start_time).total_seconds() * 1000
+
+            result.append({
+                "run_id": str(run.id),
+                "name": run.name,
+                "status": "error" if run.error else "success",
+                "latency_ms": round(latency_ms, 1) if latency_ms else None,
+                "start_time": run.start_time.isoformat() if run.start_time else None,
+                "trace_url": f"https://smith.langchain.com/o/default/projects/p/{project_name}/r/{run.id}"
+            })
+            
+        return {"runs": result}
+    
+    except Exception as e:
+        logger.error(f"Failed to fetch recent runs: {str(e)}", exc_info=True)
+        return {"runs": [], "message": f"Error fetching runs: {str(e)}"}
     
     
 

@@ -63,6 +63,12 @@
                       
                       if (!res.ok) throw new Error('Internal validation abort');
                       this.agentResult = await res.json();
+
+                      // inside executeAgentQuery, after this.agentResult = await res.json();
+                      if (this.agentResult?.run_id) {
+                          await this.loadRunMetadata(this.agentResult.run_id);
+                      }
+                    await this.loadRecentRuns();
                       
                       if (this.agentResult && this.agentResult.run_id) {
                           await this.fetchLangSmithTelemetry(this.agentResult.run_id);
@@ -84,6 +90,24 @@
                   }
               },
 
+            
+            
+
+            // NEW: recent runs fetch
+            recentRuns: [],
+            async loadRecentRuns() {
+                try {
+                    const res = await fetch('/agent/runs/recent?limit=10');
+                    if (res.ok) {
+                        const data = await res.json();
+                        this.recentRuns = data.runs || [];
+                    }
+                } catch (e) {
+                    console.warn('Recent runs fetch failed', e);
+                }
+            },
+
+            // Old: fetchLangSmithTelemetry
               async fetchLangSmithTelemetry(runId) {
                   this.traceLoading = true;
                   let attempts = 0;
@@ -249,6 +273,29 @@
                             <span x-text="agentResult.result.data_shape"></span>
                         </div>
                     </div>
+                </div>
+            </div>
+            <!-- Recent Runs -->
+            <div class="mt-8">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-[10px] font-mono text-gray-500 uppercase tracking-wider">Recent Runs</h3>
+                    <button @click="loadRecentRuns()" class="text-[10px] text-indigo-400 hover:text-indigo-300">↻ Refresh</button>
+                </div>
+
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                    <template x-for="run in recentRuns" :key="run.run_id">
+                        <div class="p-3 bg-[#111827] border border-gray-800 rounded-lg flex justify-between items-center text-xs">
+                            <div class="truncate">
+                                <div class="font-mono text-gray-200" x-text="run.name || 'Unnamed'"></div>
+                                <div class="text-[10px] text-gray-500 mt-0.5" x-text="run.start_time ? new Date(run.start_time).toLocaleString() : ''"></div>
+                            </div>
+                            <div class="flex items-center gap-3 shrink-0">
+                                <span :class="run.status === 'error' ? 'text-rose-400' : 'text-emerald-400'"
+                                    x-text="run.latency_ms ? Math.round(run.latency_ms) + 'ms' : run.status"></span>
+                                <a :href="run.trace_url" target="_blank" class="text-indigo-400 hover:text-indigo-300">↗</a>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
         </section>

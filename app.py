@@ -42,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initlialize the Langsmith SDK client
+# Langsmith SDK client
 try:
     ls_client = Client()
     logger.info("LangSmith SDK client succesfully initialized.")
@@ -84,7 +84,6 @@ async def execute_agent(req: AgentExecutionRequest):
     """Executes the ReAct agent within a run-collection block,
     capturing the exact LangSmith execution ID to route telemetry down the line
     """
-    
     
     try:
         #agent = get_standalone_agent(req.working_dir)

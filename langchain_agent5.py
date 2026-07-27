@@ -72,8 +72,8 @@ class VisualizeQuerySchema(BaseModel):
     question: str = Field(description="The original natural language question that generated the data")
     #data_file: str = Field(description="Path to the parquet file (.parquet) from the current database query. DbQueryResult file_path .")
     chart_type: str = Field(description="Chart type: bar, line, pie, scatter, histogram, or 'auto' for intelligent selection.", 
-                       default="auto"
-                       )
+                       default="auto")
+                       
                        
                        
 
@@ -182,8 +182,6 @@ class AIAgent:
             )      
         ]
 
-        
-
     # Tool implementations
    # @traceable(run_type="tool", name="FileSystem_Read")
     def read_file(self, file_path: str) -> str:
@@ -205,7 +203,6 @@ class AIAgent:
         except Exception as e:
             return f"Error reading file: {str(e)}"
 
-
    # @traceable(run_type="tool", name="List_Files")
     def list_files(self, path: str = ".") -> str:
         full_path = os.path.join(self.working_dir, path)
@@ -213,7 +210,6 @@ class AIAgent:
             return "\n".join(sorted(os.listdir(full_path)))
         except Exception as e:
             return f"Error listing files: {str(e)}"
- 
  
     #@traceable(run_type="tool", name="List_Available_Databases")    
     def list_available_databases(self, dummy: str = None) -> str:
@@ -251,7 +247,6 @@ class AIAgent:
         except Exception as e:
             return f"Could not generate suggestions: {str(e)}"
         
-
     #@traceable(run_type="chain", name="Core_DB_Execution_Engine")
     def _execute_db_query(self, db: SQLDatabase, question: str) -> Dict[str, Any]:
         try:
@@ -336,14 +331,11 @@ class AIAgent:
                 "file_path": None,
                 "error": str(e)
             }
-            
-            
-    
+               
     #@traceable(run_type="tool", name="Tool_Query_Default_DB")
     def query_database(self, question: str) -> Dict[str, Any]:
         """Query the default student_grades.db — returns structured result for frontend rendering."""
         return self._execute_db_query(self.default_db, question)
-
 
     #@traceable(run_type="tool", name="Tool_Query_Dynamic_DB")
     def query_any_database(self, db_filename: str, question: str) -> Dict[str, Any]:
@@ -363,8 +355,7 @@ class AIAgent:
                 "sql": "", "columns": [], "rows": [], "row_count": 0,
                 "error": f"Failed to open database {db_filename}: {str(e)}"
             }
-    
-    # NEW    
+       
     #@traceable(run_type="tool", name="Tool_Schema_Introspection")    
     def get_database_schema(self, db_filename: str) -> str:
         """Safely retrieve table schemas (CREATE TABLE statements) for a database file."""
@@ -381,8 +372,7 @@ class AIAgent:
         except Exception as e:
             return f"Error reading schema metadata for '{db_filename}': {str(e)}"
         
-     
-       
+         
     def visualize_query(self, question: str, chart_type: str = "auto") -> Dict[str, Any]:
         """Generate interactive Plotly visualization from parquet query results."""
         
@@ -443,9 +433,6 @@ class AIAgent:
 
         except Exception as e:
             return {"error": f"Visualization failed: {str(e)}"}
-                
-            
- 
 
     # Main chat method React loop
     @traceable(run_type="chain", name="ReAct_Agent_Master_Loop")
@@ -463,7 +450,7 @@ class AIAgent:
         else:
             # LangGraph mode: Extend with the distilled conversational history
             self.messages.extend(user_input)
-        # self.messages.append(HumanMessage(content=user_input))
+       
         
         invoke_config = {"run_name": "AIAgent_Inference_Cycle"}
         if callback_handler:
@@ -569,8 +556,6 @@ class AIAgent:
 
         # Fallback (should not reach here)
         return {"type": "text", "content": "Finished processing."}
-   
-   
     
 # Static Utility Class (holds no state of its own)  
 # @classmethod -> no need for guard = SQLGuardrail() instead use SQLGuardrail.validate_query(...)

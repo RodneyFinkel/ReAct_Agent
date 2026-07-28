@@ -24,6 +24,8 @@ RUN touch utils/__init__.py
 
 # Copy frontend
 COPY static/telemetry.html static/telemetry.html
+COPY static/splash.html static/splash.html
+COPY static/system_architecture.svg static/system_architecture.svg
 
 # Copy database files
 COPY student_grades.db .

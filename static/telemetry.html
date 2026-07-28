@@ -138,8 +138,8 @@
               this.traceLoading = true;
               let attempts = 0;
 
-              while (attempts < 3) {
-                  await new Promise(r => setTimeout(r, 2500));
+              while (attempts < 2) {
+                  await new Promise(r => setTimeout(r, 250));
                   try {
                       const res = await fetch(`/agent/trace/${runId}`);
                       if (res.ok) {

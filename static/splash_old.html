@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReAct Agent · System Architecture</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #050505;
+      --fg: #e8e8e8;
+      --muted: #6b7280;
+      --accent: #7c3aed;
+      --accent-dim: rgba(124, 58, 237, 0.15);
+      --border: rgba(255, 255, 255, 0.08);
+      --glow: rgba(124, 58, 237, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Inter", system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+
+    body {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Architecture schematic as fixed, low-opacity background */
+    .arch-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .arch-bg svg,
+    .arch-bg img {
+      width: 100%;
+      height: auto;
+      min-height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      opacity: 0.12;
+      filter: grayscale(30%) contrast(1.1) brightness(0.85);
+      transform: scale(1.02);
+    }
+
+    /* Soft vignette so content stays readable */
+    .arch-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 40%, transparent 0%, var(--bg) 75%),
+        linear-gradient(to bottom, var(--bg) 0%, transparent 12%, transparent 70%, var(--bg) 100%);
+      pointer-events: none;
+    }
+
+    /* Subtle grid overlay */
+    .grid-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 70% 50% at 50% 45%, black 20%, transparent 70%);
+    }
+
+    /* Main content */
+    main {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem 4rem;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(124, 58, 237, 0.35);
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      margin-bottom: 1.75rem;
+    }
+
+    .badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--glow);
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
+    h1 {
+      font-family: "IBM Plex Mono", monospace;
+      font-weight: 500;
+      font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #f5f5f5 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tagline {
+      font-size: clamp(0.95rem, 2vw, 1.15rem);
+      font-weight: 300;
+      color: var(--muted);
+      max-width: 28rem;
+      line-height: 1.55;
+      margin-bottom: 2.5rem;
+    }
+
+    /* Node chips from architecture */
+    .nodes {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      max-width: 36rem;
+      margin-bottom: 2.75rem;
+    }
+
+    .node {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.68rem;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      color: #a1a1aa;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.7rem;
+      border-radius: 4px;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .node:hover {
+      border-color: rgba(124, 58, 237, 0.5);
+      color: #d4d4d8;
+      background: var(--accent-dim);
+    }
+
+    /* CTA */
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-decoration: none;
+      color: #fafafa;
+      background: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%);
+      border: 1px solid rgba(167, 139, 250, 0.4);
+      padding: 0.85rem 1.6rem;
+      border-radius: 6px;
+      box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.2), 0 8px 24px -6px rgba(124, 58, 237, 0.45);
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+
+    .cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.5), 0 12px 28px -4px rgba(124, 58, 237, 0.55);
+      background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+    }
+
+    .cta svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.9;
+    }
+
+    /* Footer meta */
+    footer {
+      position: relative;
+      z-index: 10;
+      padding: 1.25rem 1.5rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      color: #52525b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      background: rgba(5, 5, 5, 0.6);
+      backdrop-filter: blur(8px);
+    }
+
+    footer span {
+      opacity: 0.8;
+    }
+
+    /* Alpine transitions */
+    [x-cloak] { display: none !important; }
+
+    .fade-enter {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    .fade-enter-active {
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+  </style>
+</head>
+<body
+  x-data="{
+    ready: false,
+    init() {
+      // slight delay so the schematic can settle
+      setTimeout(() => { this.ready = true }, 180);
+    }
+  }"
+  x-init="init()"
+>
+  <!-- Architecture schematic background -->
+  <div class="arch-bg" aria-hidden="true">
+    <img
+      src="static/system_architecture.svg"
+      alt=""
+      width="1272"
+      height="7837"
+      loading="eager"
+    />
+  </div>
+
+  <div class="grid-overlay" aria-hidden="true"></div>
+
+  <main>
+    <div
+      x-show="ready"
+      x-cloak
+      x-transition:enter="fade-enter-active"
+      x-transition:enter-start="fade-enter"
+      x-transition:enter-end=""
+      style="display: flex; flex-direction: column; align-items: center;"
+    >
+      <div class="badge">
+        system online
+      </div>
+
+      <h1>ReAct Agent</h1>
+
+      <p class="tagline">
+        Observability-first agent pipeline with LangSmith traces,
+        AST-guarded SQL tools, and interactive telemetry.
+      </p>
+
+      <div class="nodes">
+        <span class="node">FastAPI</span>
+        <span class="node">LangSmith</span>
+        <span class="node">ReAct Loop</span>
+        <span class="node">sqlglot Guardrail</span>
+        <span class="node">SQLite</span>
+        <span class="node">Parquet Cache</span>
+        <span class="node">Plotly.js</span>
+        <span class="node">Alpine.js</span>
+      </div>
+
+      <a href="telemetry.html" class="cta">
+        Launch Dashboard
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6"/>
+        </svg>
+      </a>
+    </div>
+  </main>
+
+  <footer>
+    <span>architecture schematic · v1</span>
+    <span>telemetry · react pipeline</span>
+  </footer>
+</body>
+</html>

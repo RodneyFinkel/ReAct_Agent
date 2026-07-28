@@ -56,6 +56,10 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
+async def get_splash_interface():
+    return FileResponse("static/splash.html")
+
+@app.get("/dashboard")
 async def get_root_interface():
     """Serves the unified, programmatic tracing console directly."""
     return FileResponse("static/telemetry.html")

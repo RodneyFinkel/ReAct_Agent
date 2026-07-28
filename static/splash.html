@@ -54,14 +54,17 @@
 
     .arch-bg img {
       position: absolute;
-      left: 50%;
+      left: 0;
       bottom: 0;
     /* Wide enough that the ~1226px content band becomes readable */
       /*width: clamp(1200px, 180vw, 2400px);*/
-      width: clamp(800px, 100vw, 1400px);
+      /*width: clamp(800px, 100vw, 1400px);*/
+      width: 100vw;
       height: auto;
+      min-width: 100%;
       max-width: none;
-      transform: translateX(-50%);
+      /*transform: translateX(-50%);*/
+      transform: none;
       opacity: 0.55;
       filter: contrast(1.08) brightness(1.03);
     }

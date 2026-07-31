@@ -134,11 +134,11 @@
           },
 
           // Optional old waterfall methods (can delete later)
-          async fetchLangSmithTelemetry(runId) {
+          async fetchLangSmithTelemetry(runId) { 
               this.traceLoading = true;
               let attempts = 0;
 
-              while (attempts < 2) {
+              while (attempts < 1) {
                   await new Promise(r => setTimeout(r, 250));
                   try {
                       const res = await fetch(`/agent/trace/${runId}`);
@@ -155,7 +155,7 @@
                   attempts++;
               }
               this.traceLoading = false;
-          },
+          }, 
 
           async manualRefreshTrace() {
               if (!this.agentResult?.run_id) {
@@ -321,6 +321,7 @@
                     </template>
                 </div>
             </div>
+            
             <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4 shrink-0">
                 <div>
                     <h2 class="text-xs font-mono text-indigo-400 tracking-wider uppercase font-bold">🔍 Deep Trace Explorer (LangSmith SDK)</h2>

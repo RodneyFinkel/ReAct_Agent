@@ -1,4 +1,9 @@
+<img width="1794" height="956" alt="Screenshot 2026-07-31 at 7 01 34" src="https://github.com/user-attachments/assets/ac5e5bc8-898d-4093-9edd-f44bd1e388e2" />
+
+SQLGLOT and secure system prompting
 <img width="1679" height="1043" alt="react_agent" src="https://github.com/user-attachments/assets/c38a97a9-a688-4dde-ad72-8b9a79f14894" />
+
+<img width="1472" height="964" alt="Screenshot 2026-07-31 at 6 49 06" src="https://github.com/user-attachments/assets/2283a135-d08c-4245-92ee-2d1f2bcb77db" />
 
 
 SYSTEM ARCHITECTURE

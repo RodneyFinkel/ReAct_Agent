@@ -1,3 +1,5 @@
+rodneyfinkel.github.io
+
 <img width="1794" height="956" alt="Screenshot 2026-07-31 at 7 01 34" src="https://github.com/user-attachments/assets/ac5e5bc8-898d-4093-9edd-f44bd1e388e2" />
 
 SQLGLOT and secure system prompting

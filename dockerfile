@@ -29,9 +29,10 @@ COPY static/system_architecture.svg static/system_architecture.svg
 
 # Copy database files
 COPY student_grades.db .
-COPY stocks.db .
-COPY ecommerce.db .
-
+COPY databases/stocks.db .
+COPY databases/ecommerce.db .
+COPY databases/stock_database_fin.db .
+COPY databases/stock_database2.db .
 
 
 # Environment

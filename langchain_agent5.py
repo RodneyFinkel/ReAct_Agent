@@ -82,11 +82,11 @@ class AIAgent:
     def __init__(self, api_key: str, working_dir: str = "."):
         
         self.primary_llm = ChatGroq(
-            model_name="llama-3.3-70b-versatile", 
+            model_name="openai/gpt-oss-120b", 
             temperature=0
         )
         self.fallback_llm = ChatGroq(
-            model_name="meta-llama/llama-4-scout-17b-16e-instruct",  # or a known good fallback
+            model_name="llama-3.1-8b-instant",  # or a known good fallback
             temperature=0
         )
         

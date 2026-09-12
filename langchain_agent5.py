@@ -86,7 +86,7 @@ class AIAgent:
             temperature=0
         )
         self.fallback_llm = ChatGroq(
-            model_name="llama-3.1-8b-instant",  # or a known good fallback
+            model_name="openai/gpt-oss-20b",  # or a known good fallback
             temperature=0
         )
         
